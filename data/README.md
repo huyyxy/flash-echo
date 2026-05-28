@@ -1,14 +1,14 @@
-# Data Directory
+# 数据目录
 
-Use the following layout for versioned datasets:
+版本化数据集请使用以下目录结构：
 
 ```text
-raw/          Unlabeled or source query corpora
+raw/          未标注或原始 query 语料
 processed/    train.jsonl, valid.jsonl, test.jsonl
-hard_cases/   Fixed regression samples for each model iteration
+hard_cases/   每次模型迭代固定使用的回归样本
 ```
 
-Each JSONL record should follow:
+每条 JSONL 记录应遵循如下格式：
 
 ```json
 {"query":"帮我写一封请假邮件","trigger":1,"filler_type":"ACKNOWLEDGE","source":"task_dialog","label_method":"llm_reviewed"}

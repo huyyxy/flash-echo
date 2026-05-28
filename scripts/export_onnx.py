@@ -1,10 +1,10 @@
-"""ONNX export entrypoint placeholder.
+"""ONNX 导出入口占位脚本。
 
-The exporter should package:
+导出流程应打包以下内容：
 - model.onnx
-- tokenizer files
+- tokenizer 文件
 - labels.json
-- model_card.json with model_version and evaluation metrics
+- 包含 model_version 与评估指标的 model_card.json
 """
 
 

@@ -1,8 +1,8 @@
 # filler-cls-v1
 
-This directory is reserved for the exported v1 classifier package.
+该目录预留给导出的 v1 分类器模型包。
 
-Expected files after training and export:
+训练并导出后，目录中预期包含以下文件：
 
 ```text
 model.onnx

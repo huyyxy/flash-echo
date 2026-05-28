@@ -1,22 +1,22 @@
 # Flash Echo
 
-Flash Echo is a low-latency filler words decision service for real-time voice interactions.
+Flash Echo 是一个用于实时语音交互的低延迟语气词决策服务。
 
-The service receives the current user `query` and `persona_tag`, predicts whether a filler prefix should be played, and returns a persona-specific prefix that downstream TTS and main LLM pipelines can use as the first spoken segment.
+该服务接收当前用户的 `query` 和 `persona_tag`，预测是否需要播放语气词前缀，并返回一个与 persona 对应的前缀，供下游 TTS 与主 LLM 流水线作为首段语音内容使用。
 
-## Project Layout
+## 项目结构
 
 ```text
-configs/                 Static service and template configuration
-data/                    Raw, processed, and hard-case datasets
-docs/                    Product requirements and implementation plan
-models/                  Exported model packages and metadata
-scripts/                 Data, template, training, and export utilities
-src/filler_words/        Runtime package
-tests/                   Unit and API tests
+configs/                 静态服务与模板配置
+data/                    原始、处理后及疑难样本数据集
+docs/                    产品需求与实现方案
+models/                  导出的模型包与元数据
+scripts/                 数据、模板、训练与导出工具
+src/filler_words/        运行时包
+tests/                   单元测试与 API 测试
 ```
 
-## Quick Start
+## 快速开始
 
 ```bash
 python -m venv .venv
@@ -25,7 +25,7 @@ pip install -e ".[dev]"
 uvicorn filler_words.app:create_app --factory --reload
 ```
 
-Example request:
+请求示例：
 
 ```bash
 curl -X POST http://127.0.0.1:8000/v1/filler \
@@ -33,6 +33,6 @@ curl -X POST http://127.0.0.1:8000/v1/filler \
   -d '{"request_id":"req-001","query":"你怎么看 AI 对教育行业的影响？","persona_tag":"male_white_collar"}'
 ```
 
-## Model Integration
+## 模型集成
 
-The runtime currently ships with a conservative `HeuristicClassifier` so the service can run before the ONNX model package is available. Replace it with an ONNX-backed implementation behind `BaseClassifier` when `models/filler-cls-v1/` contains the exported model, tokenizer files, label mapping, and version metadata.
+当前运行时默认使用相对保守的 `HeuristicClassifier`，以便在 ONNX 模型包尚未就绪时服务仍可运行。当 `models/filler-cls-v1/` 中包含导出的模型、tokenizer 文件、标签映射和版本元数据后，可将其替换为基于 ONNX、并实现于 `BaseClassifier` 之上的版本。

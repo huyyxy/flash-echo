@@ -1,11 +1,11 @@
-"""Training entrypoint placeholder.
+"""训练入口占位脚本。
 
-Expected inputs:
-- JSONL train/validation/test splits under data/processed/
-- Label mapping matching filler_words.core.labels.FillerType
+期望输入：
+- `data/processed/` 下的 JSONL 训练/验证/测试切分数据
+- 与 `filler_words.core.labels.FillerType` 对齐的标签映射
 
-The v1 implementation should fine-tune hfl/rbt3 as a seven-class classifier:
-NONE + ACKNOWLEDGE + THINKING + FRAME + EMPATHY + RETRIEVAL + CLARIFY_LEADIN.
+v1 实现应基于 `hfl/rbt3` 微调一个七分类模型：
+NONE + ACKNOWLEDGE + THINKING + FRAME + EMPATHY + RETRIEVAL + CLARIFY_LEADIN。
 """
 
 
