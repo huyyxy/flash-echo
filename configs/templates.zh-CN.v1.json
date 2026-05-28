@@ -1,0 +1,112 @@
+{
+  "version": "templates-v1",
+  "default_persona": "male_white_collar",
+  "locales": {
+    "zh-CN": {
+      "male_white_collar": {
+        "ACKNOWLEDGE": [
+          {"template_id": "zh-CN.male_white_collar.acknowledge.001", "text": "好的，我明白你的需求了，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.acknowledge.002", "text": "明白，我来处理一下，", "enabled": true, "weight": 1}
+        ],
+        "THINKING": [
+          {"template_id": "zh-CN.male_white_collar.thinking.001", "text": "我先梳理一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.thinking.002", "text": "这个问题需要稍微分析一下，", "enabled": true, "weight": 1}
+        ],
+        "FRAME": [
+          {"template_id": "zh-CN.male_white_collar.frame.001", "text": "关于这个问题，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.frame.002", "text": "这个问题可以这样看，", "enabled": true, "weight": 1}
+        ],
+        "EMPATHY": [
+          {"template_id": "zh-CN.male_white_collar.empathy.001", "text": "我理解你的感受，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.empathy.002", "text": "听起来这确实不太容易，", "enabled": true, "weight": 1}
+        ],
+        "RETRIEVAL": [
+          {"template_id": "zh-CN.male_white_collar.retrieval.001", "text": "我先帮你查一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.retrieval.002", "text": "我来整理一下相关信息，", "enabled": true, "weight": 1}
+        ],
+        "CLARIFY_LEADIN": [
+          {"template_id": "zh-CN.male_white_collar.clarify_leadin.001", "text": "我先确认一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.male_white_collar.clarify_leadin.002", "text": "这里我需要再明确一点，", "enabled": true, "weight": 1}
+        ]
+      },
+      "female_receptionist": {
+        "ACKNOWLEDGE": [
+          {"template_id": "zh-CN.female_receptionist.acknowledge.001", "text": "好的，明白您的意思了，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.acknowledge.002", "text": "好的，我了解了，", "enabled": true, "weight": 1}
+        ],
+        "THINKING": [
+          {"template_id": "zh-CN.female_receptionist.thinking.001", "text": "我这边先看一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.thinking.002", "text": "请稍等，我整理一下，", "enabled": true, "weight": 1}
+        ],
+        "FRAME": [
+          {"template_id": "zh-CN.female_receptionist.frame.001", "text": "关于您提到的这个问题，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.frame.002", "text": "这个可以从几个方面来看，", "enabled": true, "weight": 1}
+        ],
+        "EMPATHY": [
+          {"template_id": "zh-CN.female_receptionist.empathy.001", "text": "我能理解您的感受，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.empathy.002", "text": "听起来您现在确实有些不容易，", "enabled": true, "weight": 1}
+        ],
+        "RETRIEVAL": [
+          {"template_id": "zh-CN.female_receptionist.retrieval.001", "text": "我帮您查找一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.retrieval.002", "text": "我这边为您整理一下，", "enabled": true, "weight": 1}
+        ],
+        "CLARIFY_LEADIN": [
+          {"template_id": "zh-CN.female_receptionist.clarify_leadin.001", "text": "我先跟您确认一下，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.female_receptionist.clarify_leadin.002", "text": "这里我想再确认一个细节，", "enabled": true, "weight": 1}
+        ]
+      },
+      "grandpa": {
+        "ACKNOWLEDGE": [
+          {"template_id": "zh-CN.grandpa.acknowledge.001", "text": "好嘞，我知道了，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.acknowledge.002", "text": "行，这事我明白了，", "enabled": true, "weight": 1}
+        ],
+        "THINKING": [
+          {"template_id": "zh-CN.grandpa.thinking.001", "text": "这事让我想想，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.thinking.002", "text": "我琢磨一下，", "enabled": true, "weight": 1}
+        ],
+        "FRAME": [
+          {"template_id": "zh-CN.grandpa.frame.001", "text": "这事儿啊，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.frame.002", "text": "要我说这个问题，", "enabled": true, "weight": 1}
+        ],
+        "EMPATHY": [
+          {"template_id": "zh-CN.grandpa.empathy.001", "text": "孩子，我能懂你这心情，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.empathy.002", "text": "听着是挺让人犯难的，", "enabled": true, "weight": 1}
+        ],
+        "RETRIEVAL": [
+          {"template_id": "zh-CN.grandpa.retrieval.001", "text": "我给你找找看，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.retrieval.002", "text": "我回想整理一下，", "enabled": true, "weight": 1}
+        ],
+        "CLARIFY_LEADIN": [
+          {"template_id": "zh-CN.grandpa.clarify_leadin.001", "text": "你先让我问清楚，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.grandpa.clarify_leadin.002", "text": "这儿我得确认一下，", "enabled": true, "weight": 1}
+        ]
+      },
+      "young_girl": {
+        "ACKNOWLEDGE": [
+          {"template_id": "zh-CN.young_girl.acknowledge.001", "text": "好呀，我知道啦，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.acknowledge.002", "text": "嗯嗯，我来帮你，", "enabled": true, "weight": 1}
+        ],
+        "THINKING": [
+          {"template_id": "zh-CN.young_girl.thinking.001", "text": "我想想看哦，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.thinking.002", "text": "让我想一下下，", "enabled": true, "weight": 1}
+        ],
+        "FRAME": [
+          {"template_id": "zh-CN.young_girl.frame.001", "text": "这个问题呀，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.frame.002", "text": "我觉得可以这样看哦，", "enabled": true, "weight": 1}
+        ],
+        "EMPATHY": [
+          {"template_id": "zh-CN.young_girl.empathy.001", "text": "抱抱你，我懂这种感觉，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.empathy.002", "text": "听起来你真的有点难受呢，", "enabled": true, "weight": 1}
+        ],
+        "RETRIEVAL": [
+          {"template_id": "zh-CN.young_girl.retrieval.001", "text": "我帮你找找哦，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.retrieval.002", "text": "我来看看资料，", "enabled": true, "weight": 1}
+        ],
+        "CLARIFY_LEADIN": [
+          {"template_id": "zh-CN.young_girl.clarify_leadin.001", "text": "我先问一下哦，", "enabled": true, "weight": 1},
+          {"template_id": "zh-CN.young_girl.clarify_leadin.002", "text": "这里我有点想确认一下，", "enabled": true, "weight": 1}
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "model_version": "filler-cls-v1",
+  "base_model": "hfl/rbt3",
+  "status": "planned",
+  "labels": [
+    "NONE",
+    "ACKNOWLEDGE",
+    "THINKING",
+    "FRAME",
+    "EMPATHY",
+    "RETRIEVAL",
+    "CLARIFY_LEADIN"
+  ],
+  "target_metrics": {
+    "trigger_precision": 0.95,
+    "trigger_recall": 0.8,
+    "type_macro_f1": 0.85,
+    "p95_latency_ms": 10,
+    "p99_latency_ms": 20
+  }
+}
