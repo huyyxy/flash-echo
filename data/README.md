@@ -82,6 +82,13 @@ python3 scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
 
 更多参数见脚本内文档：`python3 scripts/prepare_sharegpt_jsonl.py --help`。
 
+```bash
+cd /Users/huyiyang/Workspace/huyyxy/flash-echo
+
+PYTHONUNBUFFERED=1 nohup python3 -u scripts/prepare_sharegpt_jsonl.py \
+  > prepare_sharegpt.log 2>&1 &
+```
+
 ## 下载预训练模型
 
 训练默认使用 `hfl/rbt3`。建议先下载到本地，避免训练时重复联网：
