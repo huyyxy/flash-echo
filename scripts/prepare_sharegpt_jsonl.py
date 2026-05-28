@@ -109,6 +109,7 @@ WHITESPACE_RE = re.compile(r"\s+")
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+PROGRESS_LOG_INTERVAL = 10
 
 
 def strip_dotenv_comment(value: str) -> str:
@@ -423,14 +424,14 @@ def write_record(outfile: TextIO, record: dict[str, Any]) -> None:
 
 def build_label_prompt(queries: list[tuple[int, str]]) -> str:
     payload = [{"id": index, "query": query} for index, (_, query) in enumerate(queries)]
+    trigger_label_priority = tuple(label for label in LABEL_PRIORITY if label != "NONE")
     return (
-        "你是实时语音交互系统的数据标注员。你的任务是判断当前用户 query 之后、主回答开始之前，"
-        "是否适合先播放一句很短的垫话，并选择一个最合适的垫话功能类别。\n\n"
+        "你是实时语音交互系统的数据标注员。你的任务是为当前用户 query 之后、主回答开始之前"
+        "要播放的一句很短垫话，选择一个最合适的垫话功能类别。\n\n"
         "判定原则：\n"
         "- 垫话不是答案本身，而是用于承接、缓冲、铺垫或澄清的短前缀。\n"
-        "- 不要因为 query 需要回答就默认触发垫话；只有主回答前自然需要短承接时才触发。\n\n"
+        "- 当前数据集只保留需要垫话的样本；即使 query 很简单，也必须选择最接近的非 NONE 类别。\n\n"
         "标签定义：\n"
-        "- NONE: 不触发垫话。适用于寒暄、结束语、短确认、非常简单的事实问答，或直接回答更自然的 query。\n"
         "- ACKNOWLEDGE: 承接确认型。适用于明确的任务、请求或指令，主回答前适合先表示已收到。\n"
         "- THINKING: 思考缓冲型。适用于需要推理、比较、解释、归纳或计算，但不一定需要结构化展开的 query。\n"
         "- FRAME: 结构铺垫型。适用于开放观点、方案设计、长回答、步骤规划或需要先搭框架的 query。\n"
@@ -439,14 +440,14 @@ def build_label_prompt(queries: list[tuple[int, str]]) -> str:
         "- CLARIFY_LEADIN: 澄清引导型。适用于信息不足、指代不明、目标不清，或存在多种合理解释、需要先问清楚的 query。\n\n"
         "约束：\n"
         "1. 只根据 query 文本判断，不假设额外上下文。\n"
-        "2. 如果不触发，trigger 必须为 0，filler_type 必须为 NONE。\n"
-        "3. 如果触发，trigger 必须为 1，filler_type 不能为 NONE。\n"
-        f"4. 多个标签都可能成立时，按优先级选择：{' > '.join(LABEL_PRIORITY)}。\n"
+        "2. trigger 必须为 1，filler_type 不能为 NONE。\n"
+        "3. 不要输出 trigger=0 或 filler_type=NONE 的标签。\n"
+        f"4. 多个标签都可能成立时，按优先级选择：{' > '.join(trigger_label_priority)}。\n"
         "5. 必须为每个输入 id 输出且只输出一条 label，id 必须与输入一致。\n"
         "6. reason 用一句简短中文说明标注依据，不要复述完整 query。\n"
         "7. 只输出 JSON 对象，不要输出 Markdown 或解释性文字。\n\n"
         "输出格式必须是：\n"
-        '{"labels":[{"id":0,"trigger":0,"filler_type":"NONE","reason":"一句话说明标注依据"}]}\n\n'
+        '{"labels":[{"id":0,"trigger":1,"filler_type":"ACKNOWLEDGE","reason":"一句话说明标注依据"}]}\n\n'
         "待标注 queries：\n"
         f"{json.dumps(payload, ensure_ascii=False)}"
     )
@@ -673,6 +674,12 @@ def main() -> int:
                 split_counts[split] += 1
                 label_counts[label["filler_type"]] += 1
                 written += 1
+                if PROGRESS_LOG_INTERVAL > 0 and written % PROGRESS_LOG_INTERVAL == 0:
+                    print(
+                        f"processed {written} samples; "
+                        f"split_counts={dict(sorted(split_counts.items()))}; "
+                        f"label_counts={dict(sorted(label_counts.items()))}"
+                    )
     finally:
         for outfile in outputs.values():
             outfile.close()

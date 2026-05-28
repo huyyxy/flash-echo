@@ -55,7 +55,7 @@ OPENAI_MODEL=gpt-4o-mini
 export OPENAI_API_KEY="your-api-key"
 export OPENAI_MODEL="gpt-4o-mini"
 
-python scripts/prepare_sharegpt_jsonl.py \
+python3 scripts/prepare_sharegpt_jsonl.py \
   --input data/raw/sft_t2t_mini.jsonl \
   --output-dir data/processed
 ```
@@ -67,7 +67,7 @@ export OPENAI_API_KEY="your-dashscope-api-key"
 export OPENAI_BASE_URL="https://dashscope.aliyuncs.com/compatible-mode/v1"
 export OPENAI_MODEL="qwen-plus"
 
-python scripts/prepare_sharegpt_jsonl.py \
+python3 scripts/prepare_sharegpt_jsonl.py \
   --base-url "$OPENAI_BASE_URL" \
   --model "$OPENAI_MODEL"
 ```
@@ -75,12 +75,12 @@ python scripts/prepare_sharegpt_jsonl.py \
 小规模试跑（最多打标 50 条，覆盖已有输出）：
 
 ```bash
-python scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
+python3 scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
 ```
 
 默认支持断点续跑：已出现在 `data/processed/train.jsonl`、`valid.jsonl`、`test.jsonl` 中的 `query` 会跳过。若要重新生成这三个文件，加上 `--overwrite`。
 
-更多参数见脚本内文档：`python scripts/prepare_sharegpt_jsonl.py --help`。
+更多参数见脚本内文档：`python3 scripts/prepare_sharegpt_jsonl.py --help`。
 
 ## 下载预训练模型
 
@@ -88,7 +88,7 @@ python scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
 
 ```bash
 pip install -e ".[ml]"
-python scripts/download_pretrained_model.py \
+python3 scripts/download_pretrained_model.py \
   --model hfl/rbt3 \
   --output-dir models/pretrained/hfl-rbt3
 ```
@@ -100,7 +100,7 @@ python scripts/download_pretrained_model.py \
 准备好 `data/processed/train.jsonl`、`valid.jsonl`、`test.jsonl` 后执行：
 
 ```bash
-python scripts/train.py \
+python3 scripts/train.py \
   --base-model models/pretrained/hfl-rbt3 \
   --output-dir models/checkpoints/filler-cls-v1 \
   --epochs 3 \
