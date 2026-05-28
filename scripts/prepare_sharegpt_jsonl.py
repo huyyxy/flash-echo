@@ -24,16 +24,23 @@
       "label_reason": "..."
     }
 
-环境变量（可与命令行参数混用）::
+环境变量（可与命令行参数混用，也会自动读取项目根目录 ``.env``）::
 
     OPENAI_API_KEY    API 密钥（也可用 ``--api-key``）
     OPENAI_BASE_URL   API 根地址，默认 https://api.openai.com/v1
     OPENAI_MODEL      模型名（也可用 ``--model``）
 
+配置优先级：命令行参数 > 当前进程环境变量 > 项目根目录 ``.env`` > 内置默认值。
+
 使用示例::
 
     # 默认：读取 data/raw/sft_t2t_mini.jsonl，写入 data/processed/
     python scripts/prepare_sharegpt_jsonl.py
+
+    # 也可在项目根目录 .env 中配置：
+    # OPENAI_API_KEY=your-api-key
+    # OPENAI_BASE_URL=https://api.openai.com/v1
+    # OPENAI_MODEL=gpt-4o-mini
 
     # 指定输入、输出目录与模型
     python scripts/prepare_sharegpt_jsonl.py \\
@@ -73,7 +80,7 @@ import time
 import unicodedata
 from collections import Counter
 from pathlib import Path
-from typing import Any, Iterator, TextIO
+from typing import Any, Iterator, Sequence, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -99,9 +106,90 @@ LABEL_PRIORITY = (
 )
 
 WHITESPACE_RE = re.compile(r"\s+")
+ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 
-def parse_args() -> argparse.Namespace:
+def strip_dotenv_comment(value: str) -> str:
+    in_single_quote = False
+    in_double_quote = False
+    escaped = False
+
+    for index, char in enumerate(value):
+        if escaped:
+            escaped = False
+            continue
+        if char == "\\" and in_double_quote:
+            escaped = True
+            continue
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+            continue
+        if char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            continue
+        if char == "#" and not in_single_quote and not in_double_quote:
+            if index == 0 or value[index - 1].isspace():
+                return value[:index].rstrip()
+    return value.strip()
+
+
+def parse_dotenv_value(raw_value: str) -> str:
+    value = strip_dotenv_comment(raw_value.strip())
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        value = value[1:-1]
+        if raw_value.strip().startswith('"'):
+            value = (
+                value.replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t")
+                .replace('\\"', '"')
+                .replace("\\\\", "\\")
+            )
+    return value
+
+
+def load_dotenv(dotenv_path: Path) -> dict[str, str]:
+    if not dotenv_path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    with dotenv_path.open("r", encoding="utf-8") as infile:
+        for line_no, line in enumerate(infile, start=1):
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            if stripped.startswith("export "):
+                stripped = stripped[len("export ") :].lstrip()
+            if "=" not in stripped:
+                print(f"skip invalid .env line {line_no}: missing '='", file=sys.stderr)
+                continue
+
+            key, raw_value = stripped.split("=", 1)
+            key = key.strip()
+            if not ENV_KEY_RE.fullmatch(key):
+                print(f"skip invalid .env line {line_no}: invalid key {key!r}", file=sys.stderr)
+                continue
+            values[key] = parse_dotenv_value(raw_value)
+    return values
+
+
+def config_value(
+    name: str,
+    *,
+    dotenv_values: dict[str, str],
+    default: str | None = None,
+) -> str | None:
+    if name in os.environ:
+        return os.environ[name]
+    if name in dotenv_values:
+        return dotenv_values[name]
+    return default
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    dotenv_values = load_dotenv(PROJECT_ROOT / ".env")
     parser = argparse.ArgumentParser(
         description="Convert ShareGPT-style JSONL conversations into filler classifier JSONL splits."
     )
@@ -123,16 +211,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", default="42", help="Seed string used by the stable hash splitter.")
     parser.add_argument("--source", default="sharegpt", help="Value written to the source field.")
     parser.add_argument("--label-method", default="llm_openai_compatible")
-    parser.add_argument("--api-key", default=os.environ.get("OPENAI_API_KEY"))
+    parser.add_argument(
+        "--api-key",
+        default=config_value("OPENAI_API_KEY", dotenv_values=dotenv_values),
+        help="OpenAI API key. Priority: CLI > environment > project .env.",
+    )
     parser.add_argument(
         "--base-url",
-        default=os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-        help="OpenAI-compatible API base URL.",
+        default=config_value(
+            "OPENAI_BASE_URL",
+            dotenv_values=dotenv_values,
+            default=DEFAULT_OPENAI_BASE_URL,
+        ),
+        help="OpenAI-compatible API base URL. Priority: CLI > environment > project .env > default.",
     )
     parser.add_argument(
         "--model",
-        default=os.environ.get("OPENAI_MODEL"),
-        help="Model name. Defaults to OPENAI_MODEL.",
+        default=config_value("OPENAI_MODEL", dotenv_values=dotenv_values),
+        help="Model name. Priority: CLI > environment > project .env.",
     )
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--temperature", type=float, default=0.0)
@@ -166,7 +262,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Replace existing output files instead of resuming from them.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def normalize_text(text: str) -> str:

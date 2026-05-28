@@ -33,11 +33,21 @@ curl -L -o data/raw/sft_t2t_mini.jsonl \
 
 可用 `--input`、`--output-dir` 覆盖；例如 `--output-dir data/processed/v2` 会生成 `data/processed/v2/train.jsonl` 等三个文件。
 
-需配置 API（环境变量或命令行参数）：
+需配置 API（环境变量、项目根目录 `.env` 或命令行参数）：
 
 - `OPENAI_API_KEY`：密钥（也可用 `--api-key`）
 - `OPENAI_BASE_URL`：兼容网关根地址，默认 `https://api.openai.com/v1`
 - `OPENAI_MODEL`：模型名（也可用 `--model`）
+
+配置优先级为：命令行参数 > 当前进程环境变量 > 项目根目录 `.env` > 内置默认值。
+
+项目根目录 `.env` 示例：
+
+```bash
+OPENAI_API_KEY=your-api-key
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_MODEL=gpt-4o-mini
+```
 
 默认全量处理（读取 `data/raw/sft_t2t_mini.jsonl`，写入 `data/processed/{train,valid,test}.jsonl`）：
 
