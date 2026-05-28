@@ -1,7 +1,7 @@
 import re
 import unicodedata
 
-
+NORMALIZER_VERSION = "normalizer-v1"
 _WHITESPACE_RE = re.compile(r"\s+")
 
 

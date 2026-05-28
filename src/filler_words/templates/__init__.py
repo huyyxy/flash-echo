@@ -1,1 +1,0 @@
-"""Template registry and selection."""

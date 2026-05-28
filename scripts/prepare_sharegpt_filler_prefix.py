@@ -1,8 +1,11 @@
-"""将 ShareGPT 风格 JSONL 转为 filler 分类器训练数据。
+"""将 ShareGPT 风格 JSONL 转为 MiniMind3 短垫话前缀（首句）训练数据。
 
 从原始语料中读取 ``conversations`` 数组，抽取 ``role`` 为 ``user`` 的轮次作为
-``query``，经 OpenAI 兼容 Chat Completions API 打标后，按稳定哈希划分并写入
-``train.jsonl`` / ``valid.jsonl`` / ``test.jsonl``（格式见 ``data/README.md``）。
+``query``，经 OpenAI 兼容 Chat Completions API 生成对应 Persona 风格的
+``filler_prefix`` 后，按稳定哈希划分并写入 ``train.jsonl`` / ``valid.jsonl`` /
+``test.jsonl``。输出为 MiniMind3 SFT 所需的 ``conversations`` 格式（与
+``sft_t2t_mini.jsonl`` 一致），训练输入模板见
+``docs/filler_words_model_implementation_steps.md`` 5.1。
 
 输入单条记录示例::
 
@@ -16,12 +19,13 @@
 输出单条记录示例::
 
     {
-      "query": "帮我写一封请假邮件",
-      "trigger": 1,
-      "filler_type": "ACKNOWLEDGE",
-      "source": "sharegpt",
-      "label_method": "llm_openai_compatible",
-      "label_reason": "..."
+      "conversations": [
+        {
+          "role": "user",
+          "content": "用户：帮我写一封请假邮件\n请生成一句可续写的短垫话前缀："
+        },
+        {"role": "assistant", "content": "好的，我来帮你整理一下，"}
+      ]
     }
 
 环境变量（可与命令行参数混用，也会自动读取项目根目录 ``.env``）::
@@ -34,38 +38,22 @@
 
 使用示例::
 
-    # 默认：读取 data/raw/sft_t2t_mini.jsonl，写入 data/processed/
-    python scripts/prepare_sharegpt_jsonl.py
+    # 默认：读取 data/raw/sft_t2t_mini.jsonl，写入 data/filler_prefix/male_white_collar/
+    python scripts/prepare_sharegpt_filler_prefix.py
 
-    # 也可在项目根目录 .env 中配置：
-    # OPENAI_API_KEY=your-api-key
-    # OPENAI_BASE_URL=https://api.openai.com/v1
-    # OPENAI_MODEL=gpt-4o-mini
+    # 指定 Persona 与输出目录
+    python scripts/prepare_sharegpt_filler_prefix.py \\
+      --persona female_receptionist \\
+      --output-dir data/filler_prefix/female_receptionist
 
-    # 指定输入、输出目录与模型
-    python scripts/prepare_sharegpt_jsonl.py \\
-      --input data/raw/my_sharegpt.jsonl \\
-      --output-dir data/processed/v2 \\
-      --model gpt-4o-mini \\
-      --api-key "$OPENAI_API_KEY"
-
-    # 使用国内或自建 OpenAI 兼容网关
-    export OPENAI_BASE_URL="https://your-gateway/v1"
-    export OPENAI_MODEL="qwen-plus"
-    python scripts/prepare_sharegpt_jsonl.py --base-url "$OPENAI_BASE_URL" --model "$OPENAI_MODEL"
-
-    # 小规模试跑：最多处理 50 条，覆盖已有输出
-    python scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
-
-    # 自定义划分比例与随机种子（哈希切分，可复现）
-    python scripts/prepare_sharegpt_jsonl.py \\
-      --train-ratio 0.85 --valid-ratio 0.1 --test-ratio 0.05 --seed project-a
+    # 小规模试跑
+    python scripts/prepare_sharegpt_filler_prefix.py --max-records 50 --overwrite
 
     # 断点续跑（默认）：已写入 output-dir 的 query 会跳过
-    python scripts/prepare_sharegpt_jsonl.py --output-dir data/processed
+    python scripts/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
 
-    # 精简输出、不去重短句
-    python scripts/prepare_sharegpt_jsonl.py --no-reason --no-dedupe --min-query-chars 1
+    # 每成功写入 50 条打印一次进度（0 表示关闭）
+    python scripts/prepare_sharegpt_filler_prefix.py --log-interval 50
 """
 
 from __future__ import annotations
@@ -85,36 +73,27 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-FILLER_TYPES = {
-    "NONE",
-    "ACKNOWLEDGE",
-    "THINKING",
-    "FRAME",
-    "EMPATHY",
-    "RETRIEVAL",
-    "CLARIFY_LEADIN",
+PERSONA_DESCRIPTIONS: dict[str, str] = {
+    "male_white_collar": "中年男白领，语气自然、干练、稳重，不夸张。",
+    "female_receptionist": "前台女助理，语气自然、礼貌、温和，不夸张。",
+    "grandpa": "老爷爷，语气亲切、平和、略带关怀，不夸张。",
+    "young_girl": "女童，语气天真、活泼、简短，不夸张。",
 }
 
-LABEL_PRIORITY = (
-    "EMPATHY",
-    "CLARIFY_LEADIN",
-    "RETRIEVAL",
-    "ACKNOWLEDGE",
-    "FRAME",
-    "THINKING",
-    "NONE",
-)
+VALID_PREFIX_SUFFIXES = ("，", "。", "！", ",", ".", "!")
+MIN_PREFIX_CHARS = 3
+PREFERRED_MAX_PREFIX_CHARS = 18
+MAX_PREFIX_CHARS = 25
 
 WHITESPACE_RE = re.compile(r"\s+")
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
+DEFAULT_PERSONA = "male_white_collar"
 PROGRESS_LOG_INTERVAL = 10
+SFT_USER_PREFIX = "用户："
+SFT_USER_PROMPT_SUFFIX = "请生成一句可续写的短垫话前缀："
 
-# 关闭支持混合思考模式的模型的 reasoning/thinking 输出，避免干扰 JSON 打标。
-# - 火山方舟: thinking.type=disabled
-# - 百炼 / Qwen: enable_thinking=false
-# - vLLM Qwen3: chat_template_kwargs.enable_thinking=false
 LLM_REQUEST_DISABLE_THINKING: dict[str, Any] = {
     "thinking": {"type": "disabled"},
     "enable_thinking": False,
@@ -202,7 +181,7 @@ def config_value(
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     dotenv_values = load_dotenv(PROJECT_ROOT / ".env")
     parser = argparse.ArgumentParser(
-        description="Convert ShareGPT-style JSONL conversations into filler classifier JSONL splits."
+        description="Convert ShareGPT-style JSONL conversations into filler-prefix SFT JSONL splits."
     )
     parser.add_argument(
         "--input",
@@ -213,15 +192,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path("data/processed"),
-        help="Directory where train.jsonl, valid.jsonl, and test.jsonl are written.",
+        default=None,
+        help="Directory where train/valid/test.jsonl are written. Defaults to data/filler_prefix/{persona}/.",
+    )
+    parser.add_argument(
+        "--persona",
+        choices=sorted(PERSONA_DESCRIPTIONS),
+        default=DEFAULT_PERSONA,
+        help="Persona tag whose style the generated filler_prefix should follow.",
     )
     parser.add_argument("--train-ratio", type=float, default=0.8)
     parser.add_argument("--valid-ratio", type=float, default=0.1)
     parser.add_argument("--test-ratio", type=float, default=0.1)
     parser.add_argument("--seed", default="42", help="Seed string used by the stable hash splitter.")
-    parser.add_argument("--source", default="sharegpt", help="Value written to the source field.")
-    parser.add_argument("--label-method", default="llm_openai_compatible")
     parser.add_argument(
         "--api-key",
         default=config_value("OPENAI_API_KEY", dotenv_values=dotenv_values),
@@ -241,16 +224,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=config_value("OPENAI_MODEL", dotenv_values=dotenv_values),
         help="Model name. Priority: CLI > environment > project .env.",
     )
-    parser.add_argument("--batch-size", type=int, default=20)
-    parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument("--batch-size", type=int, default=10)
+    parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument("--retry-wait", type=float, default=2.0)
-    parser.add_argument(
-        "--no-reason",
-        action="store_true",
-        help="Do not write label_reason to output records.",
-    )
     parser.add_argument(
         "--min-query-chars",
         type=int,
@@ -273,7 +251,25 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Replace existing output files instead of resuming from them.",
     )
-    return parser.parse_args(argv)
+    parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Skip automatic filler_prefix validation before writing records.",
+    )
+    parser.add_argument(
+        "--log-interval",
+        type=int,
+        default=PROGRESS_LOG_INTERVAL,
+        metavar="N",
+        help=(
+            "Print progress every N successfully written samples. "
+            f"Default {PROGRESS_LOG_INTERVAL}. Use 0 to disable."
+        ),
+    )
+    args = parser.parse_args(argv)
+    if args.output_dir is None:
+        args.output_dir = Path("data/filler_prefix") / args.persona
+    return args
 
 
 def normalize_text(text: str) -> str:
@@ -302,10 +298,37 @@ def turn_content(turn: dict[str, Any]) -> str | None:
     return None
 
 
-def trigger_for_label(filler_type: str) -> int:
-    if filler_type not in FILLER_TYPES:
-        raise ValueError(f"unknown filler_type: {filler_type}")
-    return 0 if filler_type == "NONE" else 1
+def normalize_filler_prefix(filler_prefix: str) -> str:
+    """规范化垫话前缀：空白折叠与 Unicode 归一化，保留中英文句末标点。"""
+    return normalize_text(filler_prefix)
+
+
+def meaningful_char_count(text: str) -> int:
+    count = 0
+    for char in text:
+        if char.isspace():
+            continue
+        if unicodedata.category(char).startswith("P"):
+            continue
+        count += 1
+    return count
+
+
+def validate_filler_prefix(filler_prefix: str) -> None:
+    prefix = normalize_filler_prefix(filler_prefix)
+    if not prefix:
+        raise ValueError("filler_prefix must not be empty")
+    if any(char in prefix for char in "\n\r\t"):
+        raise ValueError("filler_prefix must be a single line")
+    if not prefix.endswith(VALID_PREFIX_SUFFIXES):
+        raise ValueError(
+            f"filler_prefix must end with one of {VALID_PREFIX_SUFFIXES!r}, got {prefix!r}"
+        )
+    char_count = meaningful_char_count(prefix)
+    if char_count < MIN_PREFIX_CHARS:
+        raise ValueError(f"filler_prefix too short: {char_count} meaningful chars")
+    if char_count > MAX_PREFIX_CHARS:
+        raise ValueError(f"filler_prefix too long: {char_count} meaningful chars")
 
 
 def split_for_query(
@@ -326,6 +349,46 @@ def split_for_query(
 
 def query_key(query: str) -> str:
     return hashlib.sha256(query.encode("utf-8")).hexdigest()
+
+
+def build_training_user_content(query: str) -> str:
+    return f"{SFT_USER_PREFIX}{query}\n{SFT_USER_PROMPT_SUFFIX}"
+
+
+def build_sft_record(query: str, filler_prefix: str) -> dict[str, Any]:
+    return {
+        "conversations": [
+            {"role": "user", "content": build_training_user_content(query)},
+            {"role": "assistant", "content": filler_prefix},
+        ]
+    }
+
+
+def query_from_output_record(record: dict[str, Any]) -> str | None:
+    query = record.get("query")
+    if isinstance(query, str):
+        return normalize_text(query)
+
+    conversations = record.get("conversations")
+    if not isinstance(conversations, list) or not conversations:
+        return None
+
+    first_turn = conversations[0]
+    if not isinstance(first_turn, dict):
+        return None
+    if first_turn.get("role") != "user":
+        return None
+
+    content = first_turn.get("content")
+    if not isinstance(content, str):
+        return None
+    if not content.startswith(SFT_USER_PREFIX):
+        return None
+    if not content.endswith(SFT_USER_PROMPT_SUFFIX):
+        return None
+
+    query = content[len(SFT_USER_PREFIX) : -len(SFT_USER_PROMPT_SUFFIX)].removesuffix("\n")
+    return normalize_text(query)
 
 
 def iter_user_queries(input_path: Path) -> Iterator[tuple[int, str]]:
@@ -388,6 +451,8 @@ def validate_runtime_args(args: argparse.Namespace) -> None:
         raise ValueError("min-query-chars must be non-negative")
     if args.max_records < 0:
         raise ValueError("max-records must be non-negative")
+    if args.log_interval < 0:
+        raise ValueError("log-interval must be non-negative")
 
 
 def output_paths(output_dir: Path) -> dict[str, Path]:
@@ -413,8 +478,8 @@ def load_completed_queries(output_dir: Path) -> set[str]:
                 except json.JSONDecodeError as exc:
                     print(f"skip invalid existing output {path}:{line_no}: {exc}", file=sys.stderr)
                     continue
-                query = record.get("query")
-                if isinstance(query, str):
+                query = query_from_output_record(record)
+                if query is not None:
                     completed.add(query_key(query))
     return completed
 
@@ -432,33 +497,31 @@ def write_record(outfile: TextIO, record: dict[str, Any]) -> None:
     outfile.flush()
 
 
-def build_label_prompt(queries: list[tuple[int, str]]) -> str:
+def build_prefix_prompt(
+    queries: list[tuple[int, str]],
+    *,
+    persona: str,
+) -> str:
+    persona_description = PERSONA_DESCRIPTIONS[persona]
     payload = [{"id": index, "query": query} for index, (_, query) in enumerate(queries)]
-    trigger_label_priority = tuple(label for label in LABEL_PRIORITY if label != "NONE")
     return (
-        "你是实时语音交互系统的数据标注员。你的任务是为当前用户 query 之后、主回答开始之前"
-        "要播放的一句很短垫话，选择一个最合适的垫话功能类别。\n\n"
-        "判定原则：\n"
-        "- 垫话不是答案本身，而是用于承接、缓冲、铺垫或澄清的短前缀。\n"
-        "- 当前数据集只保留需要垫话的样本；即使 query 很简单，也必须选择最接近的非 NONE 类别。\n\n"
-        "标签定义：\n"
-        "- ACKNOWLEDGE: 承接确认型。适用于明确的任务、请求或指令，主回答前适合先表示已收到。\n"
-        "- THINKING: 思考缓冲型。适用于需要推理、比较、解释、归纳或计算，但不一定需要结构化展开的 query。\n"
-        "- FRAME: 结构铺垫型。适用于开放观点、方案设计、长回答、步骤规划或需要先搭框架的 query。\n"
-        "- EMPATHY: 情绪承接型。适用于用户表达情绪、压力、困惑、担忧、挫败或主观感受。\n"
-        "- RETRIEVAL: 检索/回忆型。适用于明确要求查找资料、搜索信息、总结给定材料，或回忆已知上下文事实的 query。\n"
-        "- CLARIFY_LEADIN: 澄清引导型。适用于信息不足、指代不明、目标不清，或存在多种合理解释、需要先问清楚的 query。\n\n"
-        "约束：\n"
-        "1. 只根据 query 文本判断，不假设额外上下文。\n"
-        "2. trigger 必须为 1，filler_type 不能为 NONE。\n"
-        "3. 不要输出 trigger=0 或 filler_type=NONE 的标签。\n"
-        f"4. 多个标签都可能成立时，按优先级选择：{' > '.join(trigger_label_priority)}。\n"
-        "5. 必须为每个输入 id 输出且只输出一条 label，id 必须与输入一致。\n"
-        "6. reason 用一句简短中文说明标注依据，不要复述完整 query。\n"
-        "7. 只输出 JSON 对象，不要输出 Markdown 或解释性文字。\n\n"
+        "你是实时语音交互系统的数据合成助手。请根据用户 Query 生成一句中文短垫话前缀，"
+        "用于主模型回答前立即播放。\n\n"
+        f"Persona:\n{persona}，{persona_description}\n\n"
+        "要求：\n"
+        "1. 只输出一句短前缀，不要解释，不要输出 Markdown。\n"
+        f"2. 长度优先控制在 {MIN_PREFIX_CHARS} 到 {PREFERRED_MAX_PREFIX_CHARS} 个中文字符，"
+        f"最长不超过 {MAX_PREFIX_CHARS} 个中文字符。\n"
+        "3. 句末必须以逗号、句号或感叹号结尾（中文 ，。！ 或英文 , . ! 均可）。\n"
+        "4. 不要直接回答用户问题。\n"
+        "5. 不要编造事实、数据、时间、地点或人物。\n"
+        "6. 不要说“我查到了”“我已经帮你处理好了”等未发生的操作。\n"
+        "7. 输出必须能让主模型从后面自然继续回答。\n"
+        "8. 必须为每个输入 id 输出且只输出一条 filler_prefix，id 必须与输入一致。\n"
+        "9. 只输出 JSON 对象，不要输出 Markdown 或解释性文字。\n\n"
         "输出格式必须是：\n"
-        '{"labels":[{"id":0,"trigger":1,"filler_type":"ACKNOWLEDGE","reason":"一句话说明标注依据"}]}\n\n'
-        "待标注 queries：\n"
+        '{"prefixes":[{"id":0,"filler_prefix":"这个问题可以这样看，"}]}\n\n'
+        "待生成 queries：\n"
         f"{json.dumps(payload, ensure_ascii=False)}"
     )
 
@@ -501,45 +564,6 @@ def call_openai_compatible_chat(
     return parsed["choices"][0]["message"]["content"]
 
 
-def label_batch_with_retries(
-    *,
-    batch: list[tuple[int, str]],
-    base_url: str,
-    api_key: str,
-    model: str,
-    temperature: float,
-    timeout: float,
-    retries: int,
-    retry_wait: float,
-) -> dict[int, dict[str, Any]]:
-    last_error: Exception | None = None
-    for attempt in range(1, retries + 1):
-        try:
-            response_text = call_openai_compatible_chat(
-                base_url=base_url,
-                api_key=api_key,
-                model=model,
-                prompt=build_label_prompt(batch),
-                temperature=temperature,
-                timeout=timeout,
-            )
-            return validate_llm_labels(response_text, batch)
-        except (
-            HTTPError,
-            URLError,
-            TimeoutError,
-            json.JSONDecodeError,
-            KeyError,
-            ValueError,
-        ) as exc:
-            last_error = exc
-            if attempt == retries:
-                break
-            print(f"retry batch after error on attempt {attempt}/{retries}: {exc}", file=sys.stderr)
-            time.sleep(retry_wait * attempt)
-    raise RuntimeError(f"failed to label batch after {retries} attempts: {last_error}")
-
-
 def parse_json_object(text: str) -> dict[str, Any]:
     try:
         parsed = json.loads(text)
@@ -554,45 +578,88 @@ def parse_json_object(text: str) -> dict[str, Any]:
     return parsed
 
 
-def validate_llm_labels(response_text: str, batch: list[tuple[int, str]]) -> dict[int, dict[str, Any]]:
+def validate_llm_prefixes(
+    response_text: str,
+    batch: list[tuple[int, str]],
+    *,
+    validate_prefix: bool,
+) -> dict[int, str]:
     parsed = parse_json_object(response_text)
-    labels = parsed.get("labels")
-    if not isinstance(labels, list):
-        raise ValueError("LLM response must contain a labels list")
+    prefixes = parsed.get("prefixes")
+    if not isinstance(prefixes, list):
+        raise ValueError("LLM response must contain a prefixes list")
 
     expected_ids = set(range(len(batch)))
-    result: dict[int, dict[str, Any]] = {}
-    for item in labels:
+    result: dict[int, str] = {}
+    for item in prefixes:
         if not isinstance(item, dict):
-            raise ValueError("each label item must be an object")
-        label_id = item.get("id")
-        if not isinstance(label_id, int) or isinstance(label_id, bool):
-            raise ValueError("label id must be an integer")
-        if label_id in result:
-            raise ValueError(f"duplicate label id from LLM: {label_id}")
-        filler_type = item.get("filler_type")
-        trigger = item.get("trigger")
-        if not isinstance(trigger, int) or isinstance(trigger, bool):
-            raise ValueError(f"trigger for id={label_id} must be integer 0 or 1")
-        if filler_type not in FILLER_TYPES:
-            raise ValueError(f"unknown filler_type from LLM: {filler_type}")
-        expected_trigger = trigger_for_label(filler_type)
-        if trigger != expected_trigger:
-            raise ValueError(
-                f"inconsistent trigger for id={label_id}: "
-                f"trigger={trigger}, filler_type={filler_type}"
-            )
-        result[label_id] = {
-            "trigger": trigger,
-            "filler_type": filler_type,
-            "reason": str(item.get("reason", "")).strip(),
-        }
+            raise ValueError("each prefix item must be an object")
+        prefix_id = item.get("id")
+        if not isinstance(prefix_id, int) or isinstance(prefix_id, bool):
+            raise ValueError("prefix id must be an integer")
+        if prefix_id in result:
+            raise ValueError(f"duplicate prefix id from LLM: {prefix_id}")
+
+        filler_prefix = item.get("filler_prefix")
+        if not isinstance(filler_prefix, str):
+            raise ValueError(f"filler_prefix for id={prefix_id} must be a string")
+
+        filler_prefix = normalize_filler_prefix(filler_prefix)
+        if validate_prefix:
+            validate_filler_prefix(filler_prefix)
+
+        result[prefix_id] = filler_prefix
 
     missing = expected_ids - result.keys()
     extra = result.keys() - expected_ids
     if missing or extra:
         raise ValueError(f"LLM response ids mismatch: missing={sorted(missing)} extra={sorted(extra)}")
     return result
+
+
+def generate_batch_with_retries(
+    *,
+    batch: list[tuple[int, str]],
+    persona: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    temperature: float,
+    timeout: float,
+    retries: int,
+    retry_wait: float,
+    validate_prefix: bool,
+) -> dict[int, str]:
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        try:
+            response_text = call_openai_compatible_chat(
+                base_url=base_url,
+                api_key=api_key,
+                model=model,
+                prompt=build_prefix_prompt(batch, persona=persona),
+                temperature=temperature,
+                timeout=timeout,
+            )
+            return validate_llm_prefixes(
+                response_text,
+                batch,
+                validate_prefix=validate_prefix,
+            )
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            KeyError,
+            ValueError,
+        ) as exc:
+            last_error = exc
+            if attempt == retries:
+                break
+            print(f"retry batch after error on attempt {attempt}/{retries}: {exc}", file=sys.stderr)
+            time.sleep(retry_wait * attempt)
+    raise RuntimeError(f"failed to generate filler prefixes after {retries} attempts: {last_error}")
 
 
 def validate_llm_config(args: argparse.Namespace) -> None:
@@ -613,7 +680,7 @@ def main() -> int:
 
     seen_queries: set[str] = set()
     split_counts: Counter[str] = Counter()
-    label_counts: Counter[str] = Counter()
+    prefix_length_counts: Counter[str] = Counter()
     skipped_short = 0
     skipped_duplicate = 0
     skipped_completed = 0
@@ -648,11 +715,16 @@ def main() -> int:
     if completed_queries:
         print(f"resume enabled: found {len(completed_queries)} completed queries in {args.output_dir}")
 
+    print(
+        f"persona={args.persona}; input={args.input}; output_dir={args.output_dir}; model={args.model}"
+    )
+
     outputs = open_outputs(args.output_dir, append=not args.overwrite)
     try:
         for batch in batch_items(prepared_queries(), args.batch_size):
-            labels = label_batch_with_retries(
+            prefixes = generate_batch_with_retries(
                 batch=batch,
+                persona=args.persona,
                 base_url=args.base_url,
                 api_key=args.api_key,
                 model=args.model,
@@ -660,36 +732,37 @@ def main() -> int:
                 timeout=args.timeout,
                 retries=args.retries,
                 retry_wait=args.retry_wait,
+                validate_prefix=not args.no_validate,
             )
 
             for index, (_, query) in enumerate(batch):
-                label = labels[index]
+                filler_prefix = prefixes[index]
                 split = split_for_query(
                     query,
                     seed=args.seed,
                     train_ratio=args.train_ratio,
                     valid_ratio=args.valid_ratio,
                 )
-                record = {
-                    "query": query,
-                    "trigger": label["trigger"],
-                    "filler_type": label["filler_type"],
-                    "source": args.source,
-                    "label_method": args.label_method,
-                }
-                if not args.no_reason:
-                    record["label_reason"] = label["reason"]
+                record = build_sft_record(query, filler_prefix)
                 write_record(outputs[split], record)
                 completed_queries.add(query_key(query))
 
                 split_counts[split] += 1
-                label_counts[label["filler_type"]] += 1
+                char_count = meaningful_char_count(filler_prefix)
+                if char_count <= PREFERRED_MAX_PREFIX_CHARS:
+                    prefix_length_counts["within_preferred"] += 1
+                else:
+                    prefix_length_counts["over_preferred"] += 1
                 written += 1
-                if PROGRESS_LOG_INTERVAL > 0 and written % PROGRESS_LOG_INTERVAL == 0:
+                if args.log_interval > 0 and written % args.log_interval == 0:
                     print(
                         f"processed {written} samples; "
                         f"split_counts={dict(sorted(split_counts.items()))}; "
-                        f"label_counts={dict(sorted(label_counts.items()))}"
+                        f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}; "
+                        f"skipped_short={skipped_short} "
+                        f"skipped_duplicate={skipped_duplicate} "
+                        f"skipped_completed={skipped_completed}",
+                        flush=True,
                     )
     finally:
         for outfile in outputs.values():
@@ -697,7 +770,7 @@ def main() -> int:
 
     print(f"wrote {written} samples to {args.output_dir}")
     print(f"split_counts={dict(sorted(split_counts.items()))}")
-    print(f"label_counts={dict(sorted(label_counts.items()))}")
+    print(f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}")
     print(
         f"skipped_short={skipped_short} "
         f"skipped_duplicate={skipped_duplicate} "
