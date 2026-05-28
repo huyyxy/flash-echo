@@ -20,8 +20,10 @@ import random
 import sys
 import time
 import unicodedata
+import warnings
 from collections import Counter
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -70,9 +72,9 @@ class FillerDataset(Dataset[Sample]):
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Train the flash-echo filler classifier.")
-    parser.add_argument("--train", type=Path, default=Path("data/processed/train.jsonl"))
-    parser.add_argument("--valid", type=Path, default=Path("data/processed/valid.jsonl"))
-    parser.add_argument("--test", type=Path, default=Path("data/processed/test.jsonl"))
+    parser.add_argument("--train", type=Path, default=PROJECT_ROOT / "data/processed/train.jsonl")
+    parser.add_argument("--valid", type=Path, default=PROJECT_ROOT / "data/processed/valid.jsonl")
+    parser.add_argument("--test", type=Path, default=PROJECT_ROOT / "data/processed/test.jsonl")
     parser.add_argument(
         "--base-model",
         default=None,
@@ -81,11 +83,16 @@ def parse_args() -> argparse.Namespace:
             "when present, otherwise hfl/rbt3."
         ),
     )
-    parser.add_argument("--output-dir", type=Path, default=Path("models/checkpoints/filler-cls-v1"))
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=PROJECT_ROOT / "models/checkpoints/filler-cls-v1",
+    )
     parser.add_argument("--model-version", default="filler-cls-v1")
     parser.add_argument("--max-length", type=int, default=96)
     parser.add_argument("--batch-size", type=int, default=32)
     parser.add_argument("--eval-batch-size", type=int, default=64)
+    parser.add_argument("--num-workers", type=int, default=0)
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--learning-rate", type=float, default=2e-5)
     parser.add_argument("--weight-decay", type=float, default=0.01)
@@ -112,7 +119,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def default_base_model() -> str:
-    local_model = Path("models/pretrained/hfl-rbt3")
+    local_model = PROJECT_ROOT / "models/pretrained/hfl-rbt3"
     return str(local_model) if local_model.exists() else "hfl/rbt3"
 
 
@@ -121,12 +128,16 @@ def validate_args(args: argparse.Namespace) -> None:
         raise ValueError("batch-size must be greater than 0")
     if args.eval_batch_size <= 0:
         raise ValueError("eval-batch-size must be greater than 0")
+    if args.num_workers < 0:
+        raise ValueError("num-workers must be non-negative")
     if args.epochs <= 0:
         raise ValueError("epochs must be greater than 0")
     if args.learning_rate <= 0:
         raise ValueError("learning-rate must be greater than 0")
     if args.weight_decay < 0:
         raise ValueError("weight-decay must be non-negative")
+    if args.max_grad_norm < 0:
+        raise ValueError("max-grad-norm must be non-negative")
     if not 0 <= args.warmup_ratio < 1:
         raise ValueError("warmup-ratio must be in [0, 1)")
     if args.max_length <= 0:
@@ -208,6 +219,12 @@ def select_device(device_arg: str) -> torch.device:
 
 def seed_everything(seed: int) -> None:
     random.seed(seed)
+    try:
+        import numpy as np
+    except ImportError:
+        pass
+    else:
+        np.random.seed(seed)
     torch.manual_seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
@@ -237,18 +254,34 @@ def make_loader(
     max_length: int,
     batch_size: int,
     shuffle: bool,
+    num_workers: int,
+    pin_memory: bool,
 ) -> DataLoader[dict[str, torch.Tensor]]:
+    kwargs: dict[str, Any] = {}
+    if num_workers > 0:
+        kwargs["persistent_workers"] = True
+
     return DataLoader(
         FillerDataset(samples),
         batch_size=batch_size,
         shuffle=shuffle,
-        collate_fn=lambda batch: collate_batch(batch, tokenizer=tokenizer, max_length=max_length),
+        collate_fn=partial(collate_batch, tokenizer=tokenizer, max_length=max_length),
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        **kwargs,
     )
 
 
 def class_weights(samples: Iterable[Sample], *, device: torch.device) -> torch.Tensor:
     counts = Counter(sample.label_id for sample in samples)
     total = sum(counts.values())
+    missing_labels = [ID_TO_LABEL[label_id] for label_id in range(len(LABELS)) if counts[label_id] == 0]
+    if missing_labels:
+        warnings.warn(
+            "training split is missing labels; the model cannot learn these classes: "
+            + ", ".join(missing_labels),
+            stacklevel=2,
+        )
     weights = []
     for label_id in range(len(LABELS)):
         count = counts[label_id]
@@ -278,7 +311,8 @@ def compute_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, Any]:
         confusion[true_id][pred_id] += 1
 
     per_class: dict[str, dict[str, float | int]] = {}
-    f1_values: list[float] = []
+    supported_f1_values: list[float] = []
+    all_f1_values: list[float] = []
     for label_id, label in ID_TO_LABEL.items():
         tp = confusion[label_id][label_id]
         fp = sum(confusion[row][label_id] for row in range(len(LABELS)) if row != label_id)
@@ -286,7 +320,9 @@ def compute_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, Any]:
         scores = precision_recall_f1(tp, fp, fn)
         support = sum(confusion[label_id])
         per_class[label] = {**scores, "support": support}
-        f1_values.append(scores["f1"])
+        all_f1_values.append(scores["f1"])
+        if support > 0:
+            supported_f1_values.append(scores["f1"])
 
     none_id = LABEL_TO_ID[FillerType.NONE.value]
     trigger_tp = sum(
@@ -302,7 +338,8 @@ def compute_metrics(y_true: list[int], y_pred: list[int]) -> dict[str, Any]:
     return {
         "accuracy": sum(1 for true_id, pred_id in zip(y_true, y_pred, strict=True) if true_id == pred_id)
         / len(y_true),
-        "type_macro_f1": sum(f1_values) / len(f1_values),
+        "type_macro_f1": sum(supported_f1_values) / len(supported_f1_values),
+        "type_macro_f1_all_labels": sum(all_f1_values) / len(all_f1_values),
         "trigger": precision_recall_f1(trigger_tp, trigger_fp, trigger_fn),
         "per_class": per_class,
         "confusion_matrix": confusion,
@@ -359,12 +396,15 @@ def save_model_card(
     valid_samples: list[Sample],
     test_samples: list[Sample] | None,
     best_valid_metrics: dict[str, Any],
+    best_epoch: int,
     test_metrics: dict[str, Any] | None,
 ) -> None:
     card = {
         "model_version": args.model_version,
         "base_model": base_model,
         "status": "trained",
+        "best_checkpoint": str(args.output_dir / "best"),
+        "best_epoch": best_epoch,
         "created_at_unix": int(time.time()),
         "labels": LABELS,
         "data": {
@@ -421,8 +461,10 @@ def train_one_epoch(
     max_grad_norm: float,
 ) -> float:
     model.train()
-    total_loss = 0.0
-    total_examples = 0
+    total_loss_sum = 0.0
+    total_loss_weight = 0.0
+    window_loss_sum = 0.0
+    window_loss_weight = 0.0
 
     for step, batch in enumerate(loader, start=1):
         batch = move_to_device(batch, device)
@@ -444,17 +486,27 @@ def train_one_epoch(
         scheduler.step()
 
         batch_size = labels.shape[0]
-        total_loss += float(loss.detach().cpu()) * batch_size
-        total_examples += batch_size
+        if loss_fn is not None and loss_fn.weight is not None:
+            batch_weight = float(loss_fn.weight[labels].detach().sum().cpu())
+        else:
+            batch_weight = float(batch_size)
+        batch_loss_sum = float(loss.detach().cpu()) * batch_weight
+        total_loss_sum += batch_loss_sum
+        total_loss_weight += batch_weight
+        window_loss_sum += batch_loss_sum
+        window_loss_weight += batch_weight
 
         if step == 1 or step % 50 == 0 or step == len(loader):
+            recent_loss = window_loss_sum / max(window_loss_weight, 1.0)
             print(
                 f"  step {step}/{len(loader)} "
-                f"loss={total_loss / max(total_examples, 1):.4f} "
+                f"loss={recent_loss:.4f} "
                 f"lr={scheduler.get_last_lr()[0]:.2e}"
             )
+            window_loss_sum = 0.0
+            window_loss_weight = 0.0
 
-    return total_loss / total_examples
+    return total_loss_sum / total_loss_weight
 
 
 def main() -> int:
@@ -482,6 +534,7 @@ def main() -> int:
         ignore_mismatched_sizes=True,
     )
     model.to(device)
+    pin_memory = device.type == "cuda"
 
     train_loader = make_loader(
         train_samples,
@@ -489,6 +542,8 @@ def main() -> int:
         max_length=args.max_length,
         batch_size=args.batch_size,
         shuffle=True,
+        num_workers=args.num_workers,
+        pin_memory=pin_memory,
     )
     valid_loader = make_loader(
         valid_samples,
@@ -496,6 +551,8 @@ def main() -> int:
         max_length=args.max_length,
         batch_size=args.eval_batch_size,
         shuffle=False,
+        num_workers=args.num_workers,
+        pin_memory=pin_memory,
     )
     test_loader = (
         make_loader(
@@ -504,6 +561,8 @@ def main() -> int:
             max_length=args.max_length,
             batch_size=args.eval_batch_size,
             shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=pin_memory,
         )
         if test_samples is not None
         else None
@@ -524,7 +583,9 @@ def main() -> int:
         print(f"class_weights={[round(float(value), 4) for value in weights.detach().cpu()]}")
 
     best_score = -1.0
+    best_epoch = 0
     best_valid_metrics: dict[str, Any] | None = None
+    best_model_state: dict[str, torch.Tensor] | None = None
     best_dir = args.output_dir / "best"
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -552,19 +613,23 @@ def main() -> int:
         )
         if score > best_score:
             best_score = score
+            best_epoch = epoch
             best_valid_metrics = valid_metrics
-            save_checkpoint(best_dir, model=model, tokenizer=tokenizer)
-            print(f"  saved best checkpoint to {best_dir}")
+            best_model_state = {
+                key: value.detach().cpu().clone() for key, value in model.state_dict().items()
+            }
+            print(f"  updated best checkpoint candidate for {best_dir}")
 
     if args.save_last:
         save_checkpoint(args.output_dir / "last", model=model, tokenizer=tokenizer)
 
-    if best_valid_metrics is None:
+    if best_valid_metrics is None or best_model_state is None:
         raise RuntimeError("training finished without validation metrics")
 
-    best_model = AutoModelForSequenceClassification.from_pretrained(best_dir)
-    best_model.to(device)
-    test_metrics = evaluate(best_model, test_loader, device=device) if test_loader is not None else None
+    model.load_state_dict(best_model_state)
+    model.to(device)
+    save_checkpoint(best_dir, model=model, tokenizer=tokenizer)
+    test_metrics = evaluate(model, test_loader, device=device) if test_loader is not None else None
     if test_metrics is not None:
         print(
             "test "
@@ -575,16 +640,20 @@ def main() -> int:
             f"trigger_recall={test_metrics['trigger']['recall']:.4f}"
         )
 
-    save_model_card(
-        best_dir,
-        args=args,
-        base_model=base_model,
-        train_samples=train_samples,
-        valid_samples=valid_samples,
-        test_samples=test_samples,
-        best_valid_metrics=best_valid_metrics,
-        test_metrics=test_metrics,
-    )
+    for metadata_dir in (best_dir, args.output_dir):
+        metadata_dir.mkdir(parents=True, exist_ok=True)
+        save_model_card(
+            metadata_dir,
+            args=args,
+            base_model=base_model,
+            train_samples=train_samples,
+            valid_samples=valid_samples,
+            test_samples=test_samples,
+            best_valid_metrics=best_valid_metrics,
+            best_epoch=best_epoch,
+            test_metrics=test_metrics,
+        )
+    save_labels(args.output_dir)
     print(f"done. best checkpoint: {best_dir}")
     return 0
 
