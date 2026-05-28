@@ -111,6 +111,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 PROGRESS_LOG_INTERVAL = 10
 
+# 关闭支持混合思考模式的模型的 reasoning/thinking 输出，避免干扰 JSON 打标。
+# - 火山方舟: thinking.type=disabled
+# - 百炼 / Qwen: enable_thinking=false
+# - vLLM Qwen3: chat_template_kwargs.enable_thinking=false
+LLM_REQUEST_DISABLE_THINKING: dict[str, Any] = {
+    "thinking": {"type": "disabled"},
+    "enable_thinking": False,
+    "chat_template_kwargs": {"enable_thinking": False},
+}
+
 
 def strip_dotenv_comment(value: str) -> str:
     in_single_quote = False
@@ -473,6 +483,7 @@ def call_openai_compatible_chat(
             {"role": "user", "content": prompt},
         ],
         "temperature": temperature,
+        **LLM_REQUEST_DISABLE_THINKING,
     }
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
     request = Request(
