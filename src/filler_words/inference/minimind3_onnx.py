@@ -101,6 +101,11 @@ class MiniMind3OnnxGenerator:
             max_length=int(generation_cfg["max_seq_len"]),
         )
         prompt_tokens = int(encoded["input_ids"].shape[-1])
+        model_inputs = {
+            key: encoded[key]
+            for key in ("input_ids", "attention_mask")
+            if key in encoded
+        }
 
         generate_kwargs: dict[str, Any] = {
             "max_new_tokens": int(generation_cfg["max_new_tokens"]),
@@ -113,7 +118,7 @@ class MiniMind3OnnxGenerator:
             generate_kwargs["temperature"] = float(generation_cfg.get("temperature", 0.7))
             generate_kwargs["top_p"] = float(generation_cfg.get("top_p", 0.9))
 
-        output_ids = self._model.generate(**encoded, **generate_kwargs)
+        output_ids = self._model.generate(**model_inputs, **generate_kwargs)
         generated_ids = output_ids[0][prompt_tokens:]
         text = self._tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
         completion_tokens = int(generated_ids.shape[-1])
