@@ -1,7 +1,7 @@
 """使用 MiniMind3 预训练权重进行短垫话前缀 SFT 微调。
 
 默认读取 ``data/filler_prefix/<persona>/{train,valid}.jsonl``（由
-``scripts/prepare_sharegpt_filler_prefix.py`` 生成），基于本地
+``tools/training/prepare_sharegpt_filler_prefix.py`` 生成），基于本地
 ``models/pretrained/jingyaogong-minimind-3`` 做全参数 SFT；也可选 LoRA（需 ``peft``）。
 
 训练样本格式（ShareGPT ``conversations``）::
@@ -17,16 +17,16 @@
 
 使用示例::
 
-    pip3 install -e ".[ml]"
-    python3 scripts/download_minimind3_pretrained.py
+    pip3 install -e ".[train]"
+    python3 tools/training/download_minimind3_pretrained.py
 
-    python3 scripts/train_minimind3_sft.py \\
+    python3 tools/training/train_minimind3_sft.py \\
       --persona male_white_collar \\
       --train data/filler_prefix/male_white_collar/train.jsonl \\
       --valid data/filler_prefix/male_white_collar/valid.jsonl
 
     # LoRA（需 pip install peft）
-    python3 scripts/train_minimind3_sft.py --use-lora --lora-r 16
+    python3 tools/training/train_minimind3_sft.py --use-lora --lora-r 16
 """
 
 from __future__ import annotations
@@ -52,7 +52,7 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PRETRAINED = PROJECT_ROOT / "models/pretrained/jingyaogong-minimind-3"
 DEFAULT_PERSONA = "male_white_collar"
 DEFAULT_FILLER_DATA_ROOT = PROJECT_ROOT / "data/filler_prefix"

@@ -48,7 +48,7 @@ class MiniMind3OnnxGenerator:
         except ImportError as exc:
             raise ImportError(
                 "MiniMind3 ONNX inference requires optimum and transformers. "
-                'Install with: pip install -e ".[ml]" && pip install "optimum[onnxruntime]"'
+                'Install with: pip install -e ".[infer]"'
             ) from exc
 
         self._model = ORTModelForCausalLM.from_pretrained(

@@ -8,21 +8,21 @@
 
 使用示例::
 
-    pip3 install -e ".[ml]"
-    python3 scripts/download_minimind3_pretrained.py
+    pip3 install -e ".[train]"
+    python3 tools/training/download_minimind3_pretrained.py
 
     # 国内可用 ModelScope 镜像
     pip3 install modelscope
-    python3 scripts/download_minimind3_pretrained.py --source modelscope
+    python3 tools/training/download_minimind3_pretrained.py --source modelscope
 
     # 下载 PyTorch 原生预训练 checkpoint（非 Transformers 格式）
-    python3 scripts/download_minimind3_pretrained.py \\
+    python3 tools/training/download_minimind3_pretrained.py \\
       --format pytorch \\
       --weight pretrain_768 \\
       --output-dir models/pretrained/minimind-3-pytorch
 
     # 使用 Hugging Face 镜像（环境变量）
-    HF_ENDPOINT=https://hf-mirror.com python3 scripts/download_minimind3_pretrained.py
+    HF_ENDPOINT=https://hf-mirror.com python3 tools/training/download_minimind3_pretrained.py
 """
 
 from __future__ import annotations
@@ -37,8 +37,9 @@ DEFAULT_HF_MODEL = "jingyaogong/minimind-3"
 DEFAULT_MS_MODEL = "gongjy/minimind-3"
 DEFAULT_HF_PYTORCH_REPO = "jingyaogong/minimind-3-pytorch"
 DEFAULT_MS_PYTORCH_REPO = "gongjy/minimind-3-pytorch"
-DEFAULT_TRANSFORMERS_OUTPUT = Path("models/pretrained/jingyaogong-minimind-3")
-DEFAULT_PYTORCH_OUTPUT = Path("models/pretrained/minimind-3-pytorch")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_TRANSFORMERS_OUTPUT = PROJECT_ROOT / "models/pretrained/jingyaogong-minimind-3"
+DEFAULT_PYTORCH_OUTPUT = PROJECT_ROOT / "models/pretrained/minimind-3-pytorch"
 DEFAULT_PYTORCH_WEIGHT = "pretrain_768"
 
 PYTORCH_WEIGHT_CHOICES = (

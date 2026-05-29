@@ -39,24 +39,24 @@
 使用示例::
 
     # 默认：读取 data/raw/sft_t2t_mini.jsonl，写入 data/filler_prefix/male_white_collar/
-    python scripts/prepare_sharegpt_filler_prefix.py
+    python tools/training/prepare_sharegpt_filler_prefix.py
 
     # 指定 Persona 与输出目录
-    python scripts/prepare_sharegpt_filler_prefix.py \\
+    python tools/training/prepare_sharegpt_filler_prefix.py \\
       --persona female_receptionist \\
       --output-dir data/filler_prefix/female_receptionist
 
     # 小规模试跑
-    python scripts/prepare_sharegpt_filler_prefix.py --max-records 50 --overwrite
+    python tools/training/prepare_sharegpt_filler_prefix.py --max-records 50 --overwrite
 
     # 断点续跑（默认）：已写入 output-dir 的 query 会跳过
-    python scripts/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
+    python tools/training/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
 
     # 每成功写入 50 条打印一次进度（0 表示关闭）；skipped 仅在启动前 scan summary 中打印
-    python scripts/prepare_sharegpt_filler_prefix.py --log-interval 50
+    python tools/training/prepare_sharegpt_filler_prefix.py --log-interval 50
 
     # 并发调用 LLM（文件写入仍在主线程单线程完成）
-    python scripts/prepare_sharegpt_filler_prefix.py --workers 8
+    python tools/training/prepare_sharegpt_filler_prefix.py --workers 8
 """
 
 from __future__ import annotations
@@ -91,7 +91,7 @@ MAX_PREFIX_CHARS = 25
 
 WHITESPACE_RE = re.compile(r"\s+")
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_PERSONA = "male_white_collar"
 PROGRESS_LOG_INTERVAL = 10

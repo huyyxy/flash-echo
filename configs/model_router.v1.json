@@ -1,0 +1,21 @@
+{
+  "version": "model-router-v1",
+  "routes": {
+    "male_white_collar": {
+      "model_version": "minimind3-filler-male-white-collar-v1.0.0",
+      "enabled": true
+    },
+    "female_receptionist": {
+      "model_version": "minimind3-filler-female-receptionist-v1.0.0",
+      "enabled": true
+    },
+    "grandpa": {
+      "model_version": "minimind3-filler-grandpa-v1.0.0",
+      "enabled": true
+    },
+    "young_girl": {
+      "model_version": "minimind3-filler-young-girl-v1.0.0",
+      "enabled": true
+    }
+  }
+}

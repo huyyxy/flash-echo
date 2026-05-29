@@ -1,0 +1,10 @@
+{
+  "version": "fallback-prefix-v1",
+  "zh-CN": {
+    "female_receptionist": ["我想一下，", "我来帮你梳理一下，"],
+    "male_white_collar": ["我想一下，", "这个问题可以这样看，"],
+    "grandpa": ["让我想想，", "这个问题啊，"],
+    "young_girl": ["嗯，我想想，", "让我理一理，"],
+    "default": ["我想一下，", "我来帮你梳理一下，"]
+  }
+}

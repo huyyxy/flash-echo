@@ -1,0 +1,66 @@
+{
+  "version": "static-rules-v1",
+  "locale": "zh-CN",
+  "rules": [
+    {
+      "rule_id": "greeting.reply.001",
+      "category": "greeting",
+      "match": {
+        "type": "exact_or_alias",
+        "patterns": ["你好", "您好", "哈喽", "嗨"]
+      },
+      "negative_examples": [],
+      "replies": {
+        "female_receptionist": ["你好！", "您好！"],
+        "male_white_collar": ["你好。", "您好。"],
+        "default": ["你好！"]
+      },
+      "enabled": true
+    },
+    {
+      "rule_id": "thanks.reply.001",
+      "category": "thanks",
+      "match": {
+        "type": "exact_or_alias",
+        "patterns": ["谢谢", "多谢", "辛苦了"]
+      },
+      "negative_examples": ["谢谢你帮我分析一下这个合同"],
+      "replies": {
+        "female_receptionist": ["不客气！", "应该的！"],
+        "male_white_collar": ["不客气。"],
+        "default": ["不客气！"]
+      },
+      "enabled": true
+    },
+    {
+      "rule_id": "confirm.reply.001",
+      "category": "confirm",
+      "match": {
+        "type": "exact_or_alias",
+        "patterns": ["好的", "好", "嗯", "行", "可以"]
+      },
+      "negative_examples": ["好的，那你帮我查一下"],
+      "replies": {
+        "female_receptionist": ["好的！", "没问题！"],
+        "male_white_collar": ["好的。", "明白。"],
+        "default": ["好的！"]
+      },
+      "enabled": true
+    },
+    {
+      "rule_id": "farewell.reply.001",
+      "category": "farewell",
+      "match": {
+        "type": "exact_or_alias",
+        "patterns": ["再见", "拜拜", "下次聊"]
+      },
+      "negative_examples": [],
+      "replies": {
+        "female_receptionist": ["再见！", "下次见！"],
+        "male_white_collar": ["再见。", "下次聊。"],
+        "default": ["再见！"]
+      },
+      "enabled": true
+    }
+  ]
+}

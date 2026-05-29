@@ -1,8 +1,8 @@
 """将 MiniMind3 SFT 微调 checkpoint 导出为 ONNX 部署包。
 
-默认读取 ``scripts/train_minimind3_sft.py`` 产出的
+默认读取 ``tools/training/train_minimind3_sft.py`` 产出的
 ``models/checkpoints/minimind3-filler-<persona>-v1.0.0/best``，导出到
-``models/deploy/minimind3-filler-<persona>-v1.0.0/``。
+``models/deploy/minimind3-filler-<persona-hyphen>-v1.0.0/``。
 
 部署包包含：
 
@@ -19,22 +19,21 @@ MiniMind3 基于 Qwen3 架构，推荐使用 Optimum 导出（``--export-backend
 
 使用示例::
 
-    pip3 install -e ".[ml]"
-    pip3 install "optimum[onnxruntime]"
+    pip3 install -e ".[train,infer]"
 
     # 导出 SFT best checkpoint
-    python3 scripts/export_minimind3_onnx.py \\
+    python3 tools/export/export_minimind3_onnx.py \\
       --persona male_white_collar
 
     # 指定 checkpoint 与输出目录
-    python3 scripts/export_minimind3_onnx.py \\
-      --checkpoint models/checkpoints/minimind3-filler-male-white-collar-v1.0.0/best \\
+    python3 tools/export/export_minimind3_onnx.py \\
+      --checkpoint models/checkpoints/minimind3-filler-male_white_collar-v1.0.0/best \\
       --output-dir models/deploy/minimind3-filler-male-white-collar-v1.0.0 \\
       --overwrite
 
     # LoRA checkpoint：合并后再导出
-    python3 scripts/export_minimind3_onnx.py \\
-      --checkpoint models/checkpoints/minimind3-filler-male-white-collar-v1.0.0/best \\
+    python3 tools/export/export_minimind3_onnx.py \\
+      --checkpoint models/checkpoints/minimind3-filler-male_white_collar-v1.0.0/best \\
       --base-model models/pretrained/jingyaogong-minimind-3
 """
 
@@ -53,7 +52,7 @@ import torch
 import torch.nn as nn
 from transformers import AutoModelForCausalLM, AutoTokenizer, PreTrainedTokenizerBase
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_PERSONA = "male_white_collar"
 DEFAULT_PRETRAINED = PROJECT_ROOT / "models/pretrained/jingyaogong-minimind-3"
 SFT_USER_PREFIX = "用户："
@@ -89,14 +88,14 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help=(
             "SFT checkpoint directory (typically .../best). "
-            "Default: models/checkpoints/minimind3-filler-<persona>-v1.0.0/best"
+            "Default: models/checkpoints/minimind3-filler-<persona_underscore>-v1.0.0/best"
         ),
     )
     parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
-        help="ONNX bundle output directory. Default: models/deploy/minimind3-filler-<persona>-v1.0.0",
+        help="ONNX bundle output directory. Default: models/deploy/minimind3-filler-<persona-hyphen>-v1.0.0",
     )
     parser.add_argument(
         "--base-model",
@@ -109,7 +108,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model-version",
         default=None,
-        help="Recorded in model_card.json. Default: minimind3-filler-<persona>-v1.0.0",
+        help="Recorded in model_card.json. Default: minimind3-filler-<persona-hyphen>-v1.0.0",
     )
     parser.add_argument(
         "--export-backend",
@@ -166,13 +165,14 @@ def default_base_model() -> str:
 
 
 def resolve_paths(args: argparse.Namespace) -> None:
-    version = args.model_version or f"minimind3-filler-{args.persona}-v1.0.0"
+    checkpoint_version = f"minimind3-filler-{args.persona}-v1.0.0"
+    deploy_version = args.model_version or f"minimind3-filler-{args.persona.replace('_', '-')}-v1.0.0"
     if args.model_version is None:
-        args.model_version = version
+        args.model_version = deploy_version
     if args.checkpoint is None:
-        args.checkpoint = PROJECT_ROOT / f"models/checkpoints/{version}/best"
+        args.checkpoint = PROJECT_ROOT / f"models/checkpoints/{checkpoint_version}/best"
     if args.output_dir is None:
-        args.output_dir = PROJECT_ROOT / f"models/deploy/{version}"
+        args.output_dir = PROJECT_ROOT / f"models/deploy/{deploy_version}"
 
 
 def validate_args(args: argparse.Namespace) -> None:
