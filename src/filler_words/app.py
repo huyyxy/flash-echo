@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import time
+from http import HTTPStatus
 from pathlib import Path
 
 import uvicorn
@@ -23,6 +25,38 @@ from filler_words.inference.minimind3_onnx import MiniMind3ModelPool
 from filler_words.inference.persona_router import PersonaModelRouter
 from filler_words.service.filler_service import FillerReplyService, ServiceSettings
 from filler_words.static_rules.gate import DEFAULT_STATIC_RULES, StaticReplyGate
+
+_access_logger = logging.getLogger("uvicorn.access")
+
+
+class _TimedAccessLogFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        return getattr(record, "timed_access_log", False)
+
+
+if not any(isinstance(item, _TimedAccessLogFilter) for item in _access_logger.filters):
+    _access_logger.addFilter(_TimedAccessLogFilter())
+
+
+def _client_addr(request: Request) -> str:
+    if request.client is None:
+        return "-"
+    return f"{request.client.host}:{request.client.port}"
+
+
+def _request_path(request: Request) -> str:
+    path = request.url.path
+    if request.url.query:
+        return f"{path}?{request.url.query}"
+    return path
+
+
+def _status_line(status_code: int) -> str:
+    try:
+        phrase = HTTPStatus(status_code).phrase
+    except ValueError:
+        return str(status_code)
+    return f"{status_code} {phrase}"
 
 
 def project_root() -> Path:
@@ -91,6 +125,24 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Flash Echo", version="0.1.0")
     service = build_service()
     service_model = service.settings.service_model_name
+
+    @app.middleware("http")
+    async def log_request_duration(request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        duration_ms = (time.perf_counter() - start) * 1000
+        http_version = request.scope.get("http_version", "1.1")
+        _access_logger.info(
+            '%s - "%s %s HTTP/%s" %s %.2fms',
+            _client_addr(request),
+            request.method,
+            _request_path(request),
+            http_version,
+            _status_line(response.status_code),
+            duration_ms,
+            extra={"timed_access_log": True},
+        )
+        return response
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
@@ -168,7 +220,13 @@ def _infer_error_param(message: str) -> str | None:
 def main() -> None:
     host = os.getenv("FILLER_HOST", "0.0.0.0")
     port = int(os.getenv("FILLER_PORT", "8000"))
-    uvicorn.run("filler_words.app:create_app", factory=True, host=host, port=port)
+    uvicorn.run(
+        "filler_words.app:create_app",
+        factory=True,
+        host=host,
+        port=port,
+        access_log=False,
+    )
 
 
 if __name__ == "__main__":
