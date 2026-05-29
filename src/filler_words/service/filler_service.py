@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 
@@ -18,6 +19,9 @@ from filler_words.fallback.registry import FallbackPrefixRegistry
 from filler_words.inference.minimind3_onnx import MiniMind3ModelPool
 from filler_words.inference.persona_router import PersonaModelRouter
 from filler_words.static_rules.gate import StaticReplyGate
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -109,7 +113,25 @@ class FillerReplyService:
             )
 
         generator = self.model_pool.get(route.bundle_dir)
+        logger.info(
+            "MiniMind3 input request_id=%s persona_tag=%s model_version=%s input=%r",
+            request_id,
+            metadata.persona_tag,
+            route.model_version,
+            normalized_query,
+        )
         generation = generator.generate(normalized_query)
+        logger.info(
+            "MiniMind3 output request_id=%s persona_tag=%s model_version=%s output=%r "
+            "timed_out=%s prompt_tokens=%s completion_tokens=%s",
+            request_id,
+            metadata.persona_tag,
+            route.model_version,
+            generation.text,
+            generation.timed_out,
+            generation.prompt_tokens,
+            generation.completion_tokens,
+        )
         if generation.timed_out:
             return self._fallback_response(
                 request=request,
@@ -122,6 +144,15 @@ class FillerReplyService:
 
         validation = generator.validator.validate(generation.text)
         if not validation.ok:
+            logger.warning(
+                "MiniMind3 output validation failed request_id=%s persona_tag=%s "
+                "model_version=%s reason=%s output=%r",
+                request_id,
+                metadata.persona_tag,
+                route.model_version,
+                validation.reason.value if validation.reason else None,
+                generation.text,
+            )
             return self._fallback_response(
                 request=request,
                 created=created,
