@@ -52,8 +52,11 @@
     # 断点续跑（默认）：已写入 output-dir 的 query 会跳过
     python scripts/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
 
-    # 每成功写入 50 条打印一次进度（0 表示关闭）
+    # 每成功写入 50 条打印一次进度（0 表示关闭）；skipped 仅在启动前 scan summary 中打印
     python scripts/prepare_sharegpt_filler_prefix.py --log-interval 50
+
+    # 并发调用 LLM（文件写入仍在主线程单线程完成）
+    python scripts/prepare_sharegpt_filler_prefix.py --workers 8
 """
 
 from __future__ import annotations
@@ -67,6 +70,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, Iterator, Sequence, TextIO
 from urllib.error import HTTPError, URLError
@@ -80,7 +84,7 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
     "young_girl": "女童，语气天真、活泼、简短，不夸张。",
 }
 
-VALID_PREFIX_SUFFIXES = ("，", "。", "！", ",", ".", "!")
+VALID_PREFIX_SUFFIXES = ("，", "。", "！", "？", ",", ".", "!", "?")
 MIN_PREFIX_CHARS = 3
 PREFERRED_MAX_PREFIX_CHARS = 18
 MAX_PREFIX_CHARS = 25
@@ -91,6 +95,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_PERSONA = "male_white_collar"
 PROGRESS_LOG_INTERVAL = 10
+DEFAULT_WORKERS = 4
 SFT_USER_PREFIX = "用户："
 SFT_USER_PROMPT_SUFFIX = "请生成一句可续写的短垫话前缀："
 
@@ -225,6 +230,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Model name. Priority: CLI > environment > project .env.",
     )
     parser.add_argument("--batch-size", type=int, default=10)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_WORKERS,
+        help=(
+            "Number of threads for concurrent LLM API calls. "
+            "File writes always run on the main thread."
+        ),
+    )
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--retries", type=int, default=3)
@@ -263,7 +277,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         metavar="N",
         help=(
             "Print progress every N successfully written samples. "
-            f"Default {PROGRESS_LOG_INTERVAL}. Use 0 to disable."
+            f"Default {PROGRESS_LOG_INTERVAL}. Use 0 to disable. "
+            "Skipped counters appear only in the input scan summary."
         ),
     )
     args = parser.parse_args(argv)
@@ -441,6 +456,8 @@ def validate_ratios(train_ratio: float, valid_ratio: float, test_ratio: float) -
 def validate_runtime_args(args: argparse.Namespace) -> None:
     if args.batch_size <= 0:
         raise ValueError("batch-size must be greater than 0")
+    if args.workers <= 0:
+        raise ValueError("workers must be greater than 0")
     if args.retries <= 0:
         raise ValueError("retries must be greater than 0")
     if args.retry_wait < 0:
@@ -512,7 +529,7 @@ def build_prefix_prompt(
         "1. 只输出一句短前缀，不要解释，不要输出 Markdown。\n"
         f"2. 长度优先控制在 {MIN_PREFIX_CHARS} 到 {PREFERRED_MAX_PREFIX_CHARS} 个中文字符，"
         f"最长不超过 {MAX_PREFIX_CHARS} 个中文字符。\n"
-        "3. 句末必须以逗号、句号或感叹号结尾（中文 ，。！ 或英文 , . ! 均可）。\n"
+        "3. 句末必须以逗号、句号、感叹号或问号结尾（中文 ，。！？ 或英文 , . ! ? 均可）。\n"
         "4. 不要直接回答用户问题。\n"
         "5. 不要编造事实、数据、时间、地点或人物。\n"
         "6. 不要说“我查到了”“我已经帮你处理好了”等未发生的操作。\n"
@@ -662,11 +679,98 @@ def generate_batch_with_retries(
     raise RuntimeError(f"failed to generate filler prefixes after {retries} attempts: {last_error}")
 
 
+def generate_batch_prefixes(
+    batch: list[tuple[int, str]],
+    *,
+    persona: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    temperature: float,
+    timeout: float,
+    retries: int,
+    retry_wait: float,
+    validate_prefix: bool,
+) -> dict[int, str]:
+    """仅调用 LLM，不写文件；供线程池并发执行。"""
+    return generate_batch_with_retries(
+        batch=batch,
+        persona=persona,
+        base_url=base_url,
+        api_key=api_key,
+        model=model,
+        temperature=temperature,
+        timeout=timeout,
+        retries=retries,
+        retry_wait=retry_wait,
+        validate_prefix=validate_prefix,
+    )
+
+
+def write_batch_records(
+    batch: list[tuple[int, str]],
+    prefixes: dict[int, str],
+    *,
+    outputs: dict[str, TextIO],
+    completed_queries: set[str],
+    seed: str,
+    train_ratio: float,
+    valid_ratio: float,
+    split_counts: Counter[str],
+    prefix_length_counts: Counter[str],
+) -> int:
+    """在主线程单线程写入一批生成结果。"""
+    written = 0
+    for index, (_, query) in enumerate(batch):
+        filler_prefix = prefixes[index]
+        split = split_for_query(
+            query,
+            seed=seed,
+            train_ratio=train_ratio,
+            valid_ratio=valid_ratio,
+        )
+        record = build_sft_record(query, filler_prefix)
+        write_record(outputs[split], record)
+        completed_queries.add(query_key(query))
+
+        split_counts[split] += 1
+        char_count = meaningful_char_count(filler_prefix)
+        if char_count <= PREFERRED_MAX_PREFIX_CHARS:
+            prefix_length_counts["within_preferred"] += 1
+        else:
+            prefix_length_counts["over_preferred"] += 1
+        written += 1
+    return written
+
+
 def validate_llm_config(args: argparse.Namespace) -> None:
     if not args.api_key:
         raise ValueError("missing API key. Set OPENAI_API_KEY or pass --api-key.")
     if not args.model:
         raise ValueError("missing model. Set OPENAI_MODEL or pass --model.")
+
+
+def print_input_scan_summary(
+    *,
+    pending_samples: int,
+    pending_batches: int,
+    batch_size: int,
+    completed_on_disk: int,
+    skipped_short: int,
+    skipped_duplicate: int,
+    skipped_completed: int,
+) -> None:
+    print(
+        "input scan summary: "
+        f"pending_samples={pending_samples}; "
+        f"pending_batches={pending_batches}; "
+        f"batch_size={batch_size}; "
+        f"completed_on_disk={completed_on_disk}; "
+        f"skipped_short={skipped_short}; "
+        f"skipped_duplicate={skipped_duplicate}; "
+        f"skipped_completed={skipped_completed}",
+        flush=True,
+    )
 
 
 def main() -> int:
@@ -715,66 +819,81 @@ def main() -> int:
     if completed_queries:
         print(f"resume enabled: found {len(completed_queries)} completed queries in {args.output_dir}")
 
+    batches = list(batch_items(prepared_queries(), args.batch_size))
+    pending_samples = sum(len(batch) for batch in batches)
     print(
-        f"persona={args.persona}; input={args.input}; output_dir={args.output_dir}; model={args.model}"
+        f"persona={args.persona}; input={args.input}; output_dir={args.output_dir}; "
+        f"model={args.model}; workers={args.workers}",
+        flush=True,
+    )
+    print_input_scan_summary(
+        pending_samples=pending_samples,
+        pending_batches=len(batches),
+        batch_size=args.batch_size,
+        completed_on_disk=len(completed_queries),
+        skipped_short=skipped_short,
+        skipped_duplicate=skipped_duplicate,
+        skipped_completed=skipped_completed,
     )
 
     outputs = open_outputs(args.output_dir, append=not args.overwrite)
+    llm_kwargs = {
+        "persona": args.persona,
+        "base_url": args.base_url,
+        "api_key": args.api_key,
+        "model": args.model,
+        "temperature": args.temperature,
+        "timeout": args.timeout,
+        "retries": args.retries,
+        "retry_wait": args.retry_wait,
+        "validate_prefix": not args.no_validate,
+    }
     try:
-        for batch in batch_items(prepared_queries(), args.batch_size):
-            prefixes = generate_batch_with_retries(
-                batch=batch,
-                persona=args.persona,
-                base_url=args.base_url,
-                api_key=args.api_key,
-                model=args.model,
-                temperature=args.temperature,
-                timeout=args.timeout,
-                retries=args.retries,
-                retry_wait=args.retry_wait,
-                validate_prefix=not args.no_validate,
-            )
-
-            for index, (_, query) in enumerate(batch):
-                filler_prefix = prefixes[index]
-                split = split_for_query(
-                    query,
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            future_to_batch = {
+                executor.submit(generate_batch_prefixes, batch, **llm_kwargs): batch
+                for batch in batches
+            }
+            for future in as_completed(future_to_batch):
+                batch = future_to_batch[future]
+                prefixes = future.result()
+                prev_written = written
+                written += write_batch_records(
+                    batch,
+                    prefixes,
+                    outputs=outputs,
+                    completed_queries=completed_queries,
                     seed=args.seed,
                     train_ratio=args.train_ratio,
                     valid_ratio=args.valid_ratio,
+                    split_counts=split_counts,
+                    prefix_length_counts=prefix_length_counts,
                 )
-                record = build_sft_record(query, filler_prefix)
-                write_record(outputs[split], record)
-                completed_queries.add(query_key(query))
-
-                split_counts[split] += 1
-                char_count = meaningful_char_count(filler_prefix)
-                if char_count <= PREFERRED_MAX_PREFIX_CHARS:
-                    prefix_length_counts["within_preferred"] += 1
-                else:
-                    prefix_length_counts["over_preferred"] += 1
-                written += 1
-                if args.log_interval > 0 and written % args.log_interval == 0:
+                if (
+                    args.log_interval > 0
+                    and written // args.log_interval > prev_written // args.log_interval
+                ):
                     print(
-                        f"processed {written} samples; "
+                        f"processed {written}/{pending_samples} samples; "
                         f"split_counts={dict(sorted(split_counts.items()))}; "
-                        f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}; "
-                        f"skipped_short={skipped_short} "
-                        f"skipped_duplicate={skipped_duplicate} "
-                        f"skipped_completed={skipped_completed}",
+                        f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}",
                         flush=True,
                     )
     finally:
         for outfile in outputs.values():
             outfile.close()
 
-    print(f"wrote {written} samples to {args.output_dir}")
+    print(f"wrote {written}/{pending_samples} samples to {args.output_dir}")
     print(f"split_counts={dict(sorted(split_counts.items()))}")
     print(f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}")
-    print(
-        f"skipped_short={skipped_short} "
-        f"skipped_duplicate={skipped_duplicate} "
-        f"skipped_completed={skipped_completed}"
+    print_input_scan_summary(
+        pending_samples=pending_samples,
+        pending_batches=len(batches),
+        batch_size=args.batch_size,
+        completed_on_disk=len(completed_queries),
+        skipped_short=skipped_short,
+        skipped_duplicate=skipped_duplicate,
+        skipped_completed=skipped_completed,
     )
     return 0
 
