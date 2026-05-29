@@ -57,6 +57,9 @@
     # 小规模试跑：最多处理 50 条，覆盖已有输出
     python scripts/prepare_sharegpt_jsonl.py --max-records 50 --overwrite
 
+    # 并发 8 个 worker 调用 LLM（写文件仍在主线程）
+    python scripts/prepare_sharegpt_jsonl.py --workers 8
+
     # 自定义划分比例与随机种子（哈希切分，可复现）
     python scripts/prepare_sharegpt_jsonl.py \\
       --train-ratio 0.85 --valid-ratio 0.1 --test-ratio 0.05 --seed project-a
@@ -79,6 +82,7 @@ import sys
 import time
 import unicodedata
 from collections import Counter
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any, Iterator, Sequence, TextIO
 from urllib.error import HTTPError, URLError
@@ -110,6 +114,7 @@ ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 PROGRESS_LOG_INTERVAL = 10
+DEFAULT_LLM_WORKERS = 4
 
 # 关闭支持混合思考模式的模型的 reasoning/thinking 输出，避免干扰 JSON 打标。
 # - 火山方舟: thinking.type=disabled
@@ -242,6 +247,15 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Model name. Priority: CLI > environment > project .env.",
     )
     parser.add_argument("--batch-size", type=int, default=20)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=DEFAULT_LLM_WORKERS,
+        help=(
+            f"Number of concurrent workers for LLM labeling (default: {DEFAULT_LLM_WORKERS}). "
+            "File I/O stays on the main thread."
+        ),
+    )
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--timeout", type=float, default=60.0)
     parser.add_argument("--retries", type=int, default=3)
@@ -378,6 +392,8 @@ def validate_ratios(train_ratio: float, valid_ratio: float, test_ratio: float) -
 def validate_runtime_args(args: argparse.Namespace) -> None:
     if args.batch_size <= 0:
         raise ValueError("batch-size must be greater than 0")
+    if args.workers <= 0:
+        raise ValueError("workers must be greater than 0")
     if args.retries <= 0:
         raise ValueError("retries must be greater than 0")
     if args.retry_wait < 0:
@@ -602,6 +618,108 @@ def validate_llm_config(args: argparse.Namespace) -> None:
         raise ValueError("missing model. Set OPENAI_MODEL or pass --model.")
 
 
+def write_labeled_batch(
+    batch: list[tuple[int, str]],
+    labels: dict[int, dict[str, Any]],
+    *,
+    outputs: dict[str, TextIO],
+    args: argparse.Namespace,
+    completed_queries: set[str],
+    split_counts: Counter[str],
+    label_counts: Counter[str],
+) -> int:
+    written = 0
+    for index, (_, query) in enumerate(batch):
+        label = labels[index]
+        split = split_for_query(
+            query,
+            seed=args.seed,
+            train_ratio=args.train_ratio,
+            valid_ratio=args.valid_ratio,
+        )
+        record = {
+            "query": query,
+            "trigger": label["trigger"],
+            "filler_type": label["filler_type"],
+            "source": args.source,
+            "label_method": args.label_method,
+        }
+        if not args.no_reason:
+            record["label_reason"] = label["reason"]
+        write_record(outputs[split], record)
+        completed_queries.add(query_key(query))
+        split_counts[split] += 1
+        label_counts[label["filler_type"]] += 1
+        written += 1
+    return written
+
+
+def process_batches_concurrent(
+    batches: Iterator[list[tuple[int, str]]],
+    *,
+    args: argparse.Namespace,
+    outputs: dict[str, TextIO],
+    completed_queries: set[str],
+    split_counts: Counter[str],
+    label_counts: Counter[str],
+    written_so_far: int,
+) -> int:
+    """Run LLM labeling in a thread pool; write JSONL only on the main thread."""
+    in_flight: dict[Future[dict[int, dict[str, Any]]], list[tuple[int, str]]] = {}
+    batch_iter = iter(batches)
+    written = written_so_far
+
+    def submit_until_full(executor: ThreadPoolExecutor) -> None:
+        while len(in_flight) < args.workers:
+            try:
+                batch = next(batch_iter)
+            except StopIteration:
+                break
+            future = executor.submit(
+                label_batch_with_retries,
+                batch=batch,
+                base_url=args.base_url,
+                api_key=args.api_key,
+                model=args.model,
+                temperature=args.temperature,
+                timeout=args.timeout,
+                retries=args.retries,
+                retry_wait=args.retry_wait,
+            )
+            in_flight[future] = batch
+
+    with ThreadPoolExecutor(max_workers=args.workers) as executor:
+        submit_until_full(executor)
+        while in_flight:
+            done, _ = wait(in_flight, return_when=FIRST_COMPLETED)
+            for future in done:
+                batch = in_flight.pop(future)
+                labels = future.result()
+                batch_written = write_labeled_batch(
+                    batch,
+                    labels,
+                    outputs=outputs,
+                    args=args,
+                    completed_queries=completed_queries,
+                    split_counts=split_counts,
+                    label_counts=label_counts,
+                )
+                prev_written = written
+                written += batch_written
+                if (
+                    PROGRESS_LOG_INTERVAL > 0
+                    and written // PROGRESS_LOG_INTERVAL > prev_written // PROGRESS_LOG_INTERVAL
+                ):
+                    print(
+                        f"processed {written} samples; "
+                        f"split_counts={dict(sorted(split_counts.items()))}; "
+                        f"label_counts={dict(sorted(label_counts.items()))}"
+                    )
+            submit_until_full(executor)
+
+    return written
+
+
 def main() -> int:
     args = parse_args()
     validate_ratios(args.train_ratio, args.valid_ratio, args.test_ratio)
@@ -647,50 +765,23 @@ def main() -> int:
 
     if completed_queries:
         print(f"resume enabled: found {len(completed_queries)} completed queries in {args.output_dir}")
+    print(
+        f"llm labeling concurrency: {args.workers} worker(s) in flight "
+        f"(default {DEFAULT_LLM_WORKERS}; up to {args.workers} API batch(es) at once; "
+        f"use --workers 1 for serial calls), batch_size={args.batch_size}"
+    )
 
     outputs = open_outputs(args.output_dir, append=not args.overwrite)
     try:
-        for batch in batch_items(prepared_queries(), args.batch_size):
-            labels = label_batch_with_retries(
-                batch=batch,
-                base_url=args.base_url,
-                api_key=args.api_key,
-                model=args.model,
-                temperature=args.temperature,
-                timeout=args.timeout,
-                retries=args.retries,
-                retry_wait=args.retry_wait,
-            )
-
-            for index, (_, query) in enumerate(batch):
-                label = labels[index]
-                split = split_for_query(
-                    query,
-                    seed=args.seed,
-                    train_ratio=args.train_ratio,
-                    valid_ratio=args.valid_ratio,
-                )
-                record = {
-                    "query": query,
-                    "trigger": label["trigger"],
-                    "filler_type": label["filler_type"],
-                    "source": args.source,
-                    "label_method": args.label_method,
-                }
-                if not args.no_reason:
-                    record["label_reason"] = label["reason"]
-                write_record(outputs[split], record)
-                completed_queries.add(query_key(query))
-
-                split_counts[split] += 1
-                label_counts[label["filler_type"]] += 1
-                written += 1
-                if PROGRESS_LOG_INTERVAL > 0 and written % PROGRESS_LOG_INTERVAL == 0:
-                    print(
-                        f"processed {written} samples; "
-                        f"split_counts={dict(sorted(split_counts.items()))}; "
-                        f"label_counts={dict(sorted(label_counts.items()))}"
-                    )
+        written = process_batches_concurrent(
+            batch_items(prepared_queries(), args.batch_size),
+            args=args,
+            outputs=outputs,
+            completed_queries=completed_queries,
+            split_counts=split_counts,
+            label_counts=label_counts,
+            written_so_far=written,
+        )
     finally:
         for outfile in outputs.values():
             outfile.close()
