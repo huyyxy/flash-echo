@@ -146,11 +146,12 @@ class FillerReplyService:
         if not validation.ok:
             logger.warning(
                 "MiniMind3 output validation failed request_id=%s persona_tag=%s "
-                "model_version=%s reason=%s output=%r",
+                "model_version=%s reason=%s query=%r output=%r",
                 request_id,
                 metadata.persona_tag,
                 route.model_version,
                 validation.reason.value if validation.reason else None,
+                normalized_query,
                 generation.text,
             )
             return self._fallback_response(

@@ -127,6 +127,22 @@ def test_minimind3_route_returns_prefix() -> None:
     assert response.filler_reply.model_version == "minimind3-filler-male-white-collar-v1.0.0"
 
 
+def test_minimind3_route_accepts_ascii_punctuation_boundary() -> None:
+    service = _build_test_service(generator=FakeGenerator("关于AI对教育的影响,"))
+
+    response = service.create_completion(
+        ChatCompletionRequest(
+            model="filler-reply-minimind3",
+            messages=[{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
+            metadata=RequestMetadata(persona_tag="male_white_collar", request_id="req-ascii"),
+        )
+    )
+
+    assert response.choices[0].message.content == "关于AI对教育的影响,"
+    assert response.filler_reply.route is Route.MINIMIND3_FILLER
+    assert response.filler_reply.fallback_reason is None
+
+
 def test_unknown_persona_uses_fallback() -> None:
     service = _build_test_service()
 

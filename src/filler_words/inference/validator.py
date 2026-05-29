@@ -32,10 +32,25 @@ _DIRECT_ANSWER_PATTERNS = (
     re.compile(r"我已经"),
 )
 
+_ASCII_PUNCTUATION_EQUIVALENTS = {
+    "。": ".",
+    "，": ",",
+    "！": "!",
+    "？": "?",
+    "、": ",",
+}
+
 
 class OutputValidator:
     def __init__(self, config: ValidationConfig) -> None:
-        self.config = config
+        self.config = ValidationConfig(
+            min_chars=config.min_chars,
+            max_chars=config.max_chars,
+            require_punctuation_endings=_expand_punctuation_endings(
+                config.require_punctuation_endings
+            ),
+            forbid_answer_patterns=config.forbid_answer_patterns,
+        )
         compiled = [re.compile(pattern) for pattern in config.forbid_answer_patterns]
         self._forbid_patterns = compiled + list(_DIRECT_ANSWER_PATTERNS)
 
@@ -77,6 +92,17 @@ class OutputValidator:
     def _looks_unsafe(text: str) -> bool:
         unsafe_terms = ("去死", "滚", "傻逼", "操你", "色情")
         return any(term in text for term in unsafe_terms)
+
+
+def _expand_punctuation_endings(endings: tuple[str, ...]) -> tuple[str, ...]:
+    expanded: list[str] = []
+    for ending in endings:
+        if ending not in expanded:
+            expanded.append(ending)
+        equivalent = _ASCII_PUNCTUATION_EQUIVALENTS.get(ending)
+        if equivalent and equivalent not in expanded:
+            expanded.append(equivalent)
+    return tuple(expanded)
 
 
 def load_inference_config(bundle_dir: Path) -> dict[str, Any]:
