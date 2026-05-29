@@ -4,10 +4,61 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from filler_words.core.enums import FallbackReason, ReplyKind, Route
 
+DEFAULT_SERVICE_MODEL = "filler-reply-minimind3"
+DEFAULT_PERSONA_TAG = "male_white_collar"
+
+CHAT_COMPLETION_OPENAPI_EXAMPLES: dict[str, dict[str, Any]] = {
+    "filler_prefix": {
+        "summary": "模型生成前缀",
+        "description": "复杂问题，由 MiniMind3 生成可续写的语气词前缀。",
+        "value": {
+            "model": DEFAULT_SERVICE_MODEL,
+            "messages": [{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
+            "metadata": {
+                "persona_tag": DEFAULT_PERSONA_TAG,
+                "locale": "zh-CN",
+                "request_id": "req-demo-001",
+            },
+        },
+    },
+    "static_greeting": {
+        "summary": "静态问候",
+        "description": "命中静态规则，直接返回完整短回复。",
+        "value": {
+            "model": DEFAULT_SERVICE_MODEL,
+            "messages": [{"role": "user", "content": "你好"}],
+            "metadata": {
+                "persona_tag": DEFAULT_PERSONA_TAG,
+                "locale": "zh-CN",
+                "request_id": "req-demo-002",
+            },
+        },
+    },
+    "female_receptionist": {
+        "summary": "前台女助理",
+        "description": "切换 persona 为 female_receptionist。",
+        "value": {
+            "model": DEFAULT_SERVICE_MODEL,
+            "messages": [{"role": "user", "content": "谢谢你的帮助"}],
+            "metadata": {
+                "persona_tag": "female_receptionist",
+                "locale": "zh-CN",
+                "request_id": "req-demo-003",
+            },
+        },
+    },
+}
+
 
 class ChatMessage(BaseModel):
-    role: Literal["system", "user", "assistant", "tool"]
-    content: str
+    role: Literal["system", "user", "assistant", "tool"] = Field(
+        ...,
+        examples=["user"],
+    )
+    content: str = Field(
+        ...,
+        examples=["你怎么看 AI 对教育行业的影响？"],
+    )
 
     @field_validator("content")
     @classmethod
@@ -16,9 +67,21 @@ class ChatMessage(BaseModel):
 
 
 class RequestMetadata(BaseModel):
-    persona_tag: str = Field(..., min_length=1)
-    locale: str = Field(default="zh-CN")
-    request_id: str | None = None
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "persona_tag": DEFAULT_PERSONA_TAG,
+                    "locale": "zh-CN",
+                    "request_id": "req-demo-001",
+                }
+            ]
+        }
+    )
+
+    persona_tag: str = Field(..., min_length=1, examples=[DEFAULT_PERSONA_TAG])
+    locale: str = Field(default="zh-CN", examples=["zh-CN"])
+    request_id: str | None = Field(default=None, examples=["req-demo-001"])
 
     @field_validator("persona_tag", "locale")
     @classmethod
@@ -30,10 +93,29 @@ class RequestMetadata(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str = Field(..., min_length=1)
-    messages: list[ChatMessage] = Field(..., min_length=1)
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [CHAT_COMPLETION_OPENAPI_EXAMPLES["filler_prefix"]["value"]]
+        }
+    )
+
+    model: str = Field(..., min_length=1, examples=[DEFAULT_SERVICE_MODEL])
+    messages: list[ChatMessage] = Field(
+        ...,
+        min_length=1,
+        examples=[[{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}]],
+    )
     stream: bool = False
-    metadata: RequestMetadata | None = None
+    metadata: RequestMetadata | None = Field(
+        default=None,
+        examples=[
+            {
+                "persona_tag": DEFAULT_PERSONA_TAG,
+                "locale": "zh-CN",
+                "request_id": "req-demo-001",
+            }
+        ],
+    )
 
     @field_validator("model")
     @classmethod

@@ -6,10 +6,11 @@ import time
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from filler_words.api.schemas import (
+    CHAT_COMPLETION_OPENAPI_EXAMPLES,
     ChatCompletionRequest,
     ChatCompletionResponse,
     ErrorDetail,
@@ -109,7 +110,9 @@ def create_app() -> FastAPI:
         )
 
     @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
-    def chat_completions(request: ChatCompletionRequest) -> ChatCompletionResponse:
+    def chat_completions(
+        request: ChatCompletionRequest = Body(openapi_examples=CHAT_COMPLETION_OPENAPI_EXAMPLES),
+    ) -> ChatCompletionResponse:
         if request.stream:
             raise HTTPException(
                 status_code=501,
