@@ -175,7 +175,7 @@ Static Reply Gate 只覆盖高置信、高频、低歧义、无需 Qwen-Plus 续
       "rule_id": "thanks.reply.001",
       "category": "thanks",
       "match": {
-        "type": "exact_or_alias",
+        "type": "exact",
         "patterns": ["谢谢", "多谢", "辛苦了"]
       },
       "negative_examples": ["谢谢你帮我分析一下这个合同"],
@@ -193,7 +193,12 @@ Static Reply Gate 只覆盖高置信、高频、低歧义、无需 Qwen-Plus 续
 字段要求：
 
 1. `rule_id` 全局唯一，并能反映规则类别。
-2. `match` 支持归一化文本后的精确匹配、别名匹配、前缀匹配或少量保守正则。
+2. `match.type` 取值为 `exact`、`exact_with_trailing_punctuation`、`prefix`、`regex` 之一（见 `StaticRuleMatchType`）：
+   - `exact`：归一化后与 `patterns` 中任一项完全一致，可用于单个标准表达或多个等价表达。
+   - `exact_with_trailing_punctuation`：在 `exact` 基础上，允许 Query 句尾带非问号类语气/停顿标点（如 `。`、`！`、`，`、`~`），但不去除 `？` 或 `?`。
+   - `prefix`：归一化后以 `patterns` 中某一项为前缀。
+   - `regex`：归一化后全文匹配 `patterns` 中的正则（`fullmatch`）；仅用于少量保守规则。
+   - 历史值 `alias`、`exact_or_alias` 仍兼容，等价于 `exact`。
 3. `negative_examples` 必须覆盖容易误拦截的真实问题。
 4. `replies` 按 Persona 配置候选完整短回复，并提供 `default` 兜底。
 5. 每条规则至少配置 3 到 10 条候选短回复，候选不足时可先固定返回，但需要在验收中标记。

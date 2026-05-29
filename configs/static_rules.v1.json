@@ -6,7 +6,7 @@
       "rule_id": "greeting.reply.001",
       "category": "greeting",
       "match": {
-        "type": "exact_or_alias",
+        "type": "exact_with_trailing_punctuation",
         "patterns": ["你好", "您好", "哈喽", "嗨"]
       },
       "negative_examples": [],
@@ -21,7 +21,7 @@
       "rule_id": "thanks.reply.001",
       "category": "thanks",
       "match": {
-        "type": "exact_or_alias",
+        "type": "exact_with_trailing_punctuation",
         "patterns": ["谢谢", "多谢", "辛苦了"]
       },
       "negative_examples": ["谢谢你帮我分析一下这个合同"],
@@ -36,7 +36,7 @@
       "rule_id": "confirm.reply.001",
       "category": "confirm",
       "match": {
-        "type": "exact_or_alias",
+        "type": "exact_with_trailing_punctuation",
         "patterns": ["好的", "好", "嗯", "行", "可以"]
       },
       "negative_examples": ["好的，那你帮我查一下"],
@@ -51,7 +51,7 @@
       "rule_id": "farewell.reply.001",
       "category": "farewell",
       "match": {
-        "type": "exact_or_alias",
+        "type": "exact_with_trailing_punctuation",
         "patterns": ["再见", "拜拜", "下次聊"]
       },
       "negative_examples": [],

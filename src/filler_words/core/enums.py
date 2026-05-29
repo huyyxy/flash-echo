@@ -19,3 +19,12 @@ class FallbackReason(str, Enum):
     INVALID_BOUNDARY = "invalid_boundary"
     DIRECT_ANSWER = "direct_answer"
     UNSAFE_OUTPUT = "unsafe_output"
+
+
+class StaticRuleMatchType(str, Enum):
+    """静态规则 match.type 取值。"""
+
+    EXACT = "exact"
+    PREFIX = "prefix"
+    REGEX = "regex"
+    EXACT_WITH_TRAILING_PUNCTUATION = "exact_with_trailing_punctuation"
