@@ -39,24 +39,24 @@
 使用示例::
 
     # 默认：读取 data/raw/sft_t2t_mini.jsonl，写入 data/filler_prefix/male_white_collar/
-    python tools/training/prepare_sharegpt_filler_prefix.py
+    python3 tools/training/prepare_sharegpt_filler_prefix.py
 
     # 指定 Persona 与输出目录
-    python tools/training/prepare_sharegpt_filler_prefix.py \\
+    python3 tools/training/prepare_sharegpt_filler_prefix.py \\
       --persona female_receptionist \\
       --output-dir data/filler_prefix/female_receptionist
 
     # 小规模试跑
-    python tools/training/prepare_sharegpt_filler_prefix.py --max-records 50 --overwrite
+    python3 tools/training/prepare_sharegpt_filler_prefix.py --max-records 50 --overwrite
 
     # 断点续跑（默认）：已写入 output-dir 的 query 会跳过
-    python tools/training/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
+    python3 tools/training/prepare_sharegpt_filler_prefix.py --output-dir data/filler_prefix/grandpa
 
     # 每成功写入 50 条打印一次进度（0 表示关闭）；skipped 仅在启动前 scan summary 中打印
-    python tools/training/prepare_sharegpt_filler_prefix.py --log-interval 50
+    python3 tools/training/prepare_sharegpt_filler_prefix.py --log-interval 50
 
     # 并发调用 LLM（文件写入仍在主线程单线程完成）
-    python tools/training/prepare_sharegpt_filler_prefix.py --workers 8
+    python3 tools/training/prepare_sharegpt_filler_prefix.py --workers 8
 """
 
 from __future__ import annotations
@@ -84,10 +84,11 @@ PERSONA_DESCRIPTIONS: dict[str, str] = {
     "young_girl": "女童，语气天真、活泼、简短，不夸张。",
 }
 
-VALID_PREFIX_SUFFIXES = ("，", "。", "！", "？", ",", ".", "!", "?")
-MIN_PREFIX_CHARS = 3
+VALID_PREFIX_SUFFIXES = ("，", "。", "！", "？", ",", ".", "!", "?", "……", ":", "：")
+MIN_PREFIX_CHARS = 2
 PREFERRED_MAX_PREFIX_CHARS = 18
 MAX_PREFIX_CHARS = 25
+ALLOWED_SINGLE_CHAR_INTERJECTIONS = frozenset({"嗯", "啊", "哦", "呃", "唉", "哈", "诶", "额"})
 
 WHITESPACE_RE = re.compile(r"\s+")
 ENV_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -329,6 +330,18 @@ def meaningful_char_count(text: str) -> int:
     return count
 
 
+def prefix_stem_without_suffix(prefix: str) -> str:
+    stem = prefix
+    while stem and unicodedata.category(stem[-1]).startswith("P"):
+        stem = stem[:-1]
+    return stem
+
+
+def is_allowed_short_interjection(prefix: str) -> bool:
+    stem = prefix_stem_without_suffix(prefix)
+    return len(stem) == 1 and stem in ALLOWED_SINGLE_CHAR_INTERJECTIONS
+
+
 def validate_filler_prefix(filler_prefix: str) -> None:
     prefix = normalize_filler_prefix(filler_prefix)
     if not prefix:
@@ -340,7 +353,7 @@ def validate_filler_prefix(filler_prefix: str) -> None:
             f"filler_prefix must end with one of {VALID_PREFIX_SUFFIXES!r}, got {prefix!r}"
         )
     char_count = meaningful_char_count(prefix)
-    if char_count < MIN_PREFIX_CHARS:
+    if char_count < MIN_PREFIX_CHARS and not is_allowed_short_interjection(prefix):
         raise ValueError(f"filler_prefix too short: {char_count} meaningful chars")
     if char_count > MAX_PREFIX_CHARS:
         raise ValueError(f"filler_prefix too long: {char_count} meaningful chars")
@@ -527,8 +540,10 @@ def build_prefix_prompt(
         f"Persona:\n{persona}，{persona_description}\n\n"
         "要求：\n"
         "1. 只输出一句短前缀，不要解释，不要输出 Markdown。\n"
-        f"2. 长度优先控制在 {MIN_PREFIX_CHARS} 到 {PREFERRED_MAX_PREFIX_CHARS} 个中文字符，"
-        f"最长不超过 {MAX_PREFIX_CHARS} 个中文字符。\n"
+        f"2. 长度优先控制在 {MIN_PREFIX_CHARS} 到 {PREFERRED_MAX_PREFIX_CHARS} 个实义字，"
+        f"最长不超过 {MAX_PREFIX_CHARS} 个实义字；"
+        "优先使用带衔接语的短句（如「让我想想，」「这个问题，」），"
+        "避免未说完的名词短语（如「昨天的电影是」）。\n"
         "3. 句末必须以逗号、句号、感叹号或问号结尾（中文 ，。！？ 或英文 , . ! ? 均可）。\n"
         "4. 不要直接回答用户问题。\n"
         "5. 不要编造事实、数据、时间、地点或人物。\n"
@@ -595,18 +610,12 @@ def parse_json_object(text: str) -> dict[str, Any]:
     return parsed
 
 
-def validate_llm_prefixes(
-    response_text: str,
-    batch: list[tuple[int, str]],
-    *,
-    validate_prefix: bool,
-) -> dict[int, str]:
+def parse_llm_prefix_map(response_text: str) -> dict[int, str]:
     parsed = parse_json_object(response_text)
     prefixes = parsed.get("prefixes")
     if not isinstance(prefixes, list):
         raise ValueError("LLM response must contain a prefixes list")
 
-    expected_ids = set(range(len(batch)))
     result: dict[int, str] = {}
     for item in prefixes:
         if not isinstance(item, dict):
@@ -621,17 +630,49 @@ def validate_llm_prefixes(
         if not isinstance(filler_prefix, str):
             raise ValueError(f"filler_prefix for id={prefix_id} must be a string")
 
-        filler_prefix = normalize_filler_prefix(filler_prefix)
-        if validate_prefix:
-            validate_filler_prefix(filler_prefix)
-
-        result[prefix_id] = filler_prefix
-
-    missing = expected_ids - result.keys()
-    extra = result.keys() - expected_ids
-    if missing or extra:
-        raise ValueError(f"LLM response ids mismatch: missing={sorted(missing)} extra={sorted(extra)}")
+        result[prefix_id] = normalize_filler_prefix(filler_prefix)
     return result
+
+
+def validate_llm_prefixes_per_item(
+    response_text: str,
+    batch: list[tuple[int, str]],
+    *,
+    validate_prefix: bool,
+) -> tuple[dict[int, str], dict[int, str]]:
+    parsed = parse_llm_prefix_map(response_text)
+    expected_ids = set(range(len(batch)))
+    extra = parsed.keys() - expected_ids
+    if extra:
+        raise ValueError(f"LLM response ids mismatch: extra={sorted(extra)}")
+
+    valid: dict[int, str] = {}
+    invalid: dict[int, str] = {}
+    for index in range(len(batch)):
+        filler_prefix = parsed.get(index)
+        if filler_prefix is None:
+            line_no, query = batch[index]
+            invalid[index] = f"missing prefix id={index}; line_no={line_no} query={query!r}"
+            continue
+        if validate_prefix:
+            try:
+                validate_filler_prefix(filler_prefix)
+            except ValueError as exc:
+                line_no, query = batch[index]
+                invalid[index] = (
+                    f"{exc}; id={index} line_no={line_no} query={query!r} "
+                    f"filler_prefix={filler_prefix!r}"
+                )
+                continue
+        valid[index] = filler_prefix
+    return valid, invalid
+
+
+def format_retry_errors(errors: dict[int, str], *, limit: int = 2) -> str:
+    parts = [errors[index] for index in sorted(errors)[:limit]]
+    if len(errors) > limit:
+        parts.append(f"... and {len(errors) - limit} more")
+    return "; ".join(parts)
 
 
 def generate_batch_with_retries(
@@ -646,21 +687,28 @@ def generate_batch_with_retries(
     retries: int,
     retry_wait: float,
     validate_prefix: bool,
-) -> dict[int, str]:
-    last_error: Exception | None = None
+) -> tuple[dict[int, str], list[tuple[int, str, str]]]:
+    results: dict[int, str] = {}
+    pending_indices = list(range(len(batch)))
+    last_errors: dict[int, str] = {}
+
     for attempt in range(1, retries + 1):
+        if not pending_indices:
+            break
+
+        sub_batch = [batch[index] for index in pending_indices]
         try:
             response_text = call_openai_compatible_chat(
                 base_url=base_url,
                 api_key=api_key,
                 model=model,
-                prompt=build_prefix_prompt(batch, persona=persona),
+                prompt=build_prefix_prompt(sub_batch, persona=persona),
                 temperature=temperature,
                 timeout=timeout,
             )
-            return validate_llm_prefixes(
+            valid, invalid = validate_llm_prefixes_per_item(
                 response_text,
-                batch,
+                sub_batch,
                 validate_prefix=validate_prefix,
             )
         except (
@@ -671,12 +719,40 @@ def generate_batch_with_retries(
             KeyError,
             ValueError,
         ) as exc:
-            last_error = exc
-            if attempt == retries:
-                break
-            print(f"retry batch after error on attempt {attempt}/{retries}: {exc}", file=sys.stderr)
+            for index in pending_indices:
+                last_errors[index] = str(exc)
+            if attempt < retries:
+                print(
+                    f"retry {len(pending_indices)} sample(s) after error on "
+                    f"attempt {attempt}/{retries}: {exc}",
+                    file=sys.stderr,
+                )
+                time.sleep(retry_wait * attempt)
+            continue
+
+        for local_index, filler_prefix in valid.items():
+            results[pending_indices[local_index]] = filler_prefix
+
+        new_pending: list[int] = []
+        for local_index, error in invalid.items():
+            original_index = pending_indices[local_index]
+            last_errors[original_index] = error
+            new_pending.append(original_index)
+        pending_indices = new_pending
+
+        if pending_indices and attempt < retries:
+            print(
+                f"retry {len(pending_indices)} sample(s) after validation failure on "
+                f"attempt {attempt}/{retries}: {format_retry_errors(last_errors)}",
+                file=sys.stderr,
+            )
             time.sleep(retry_wait * attempt)
-    raise RuntimeError(f"failed to generate filler prefixes after {retries} attempts: {last_error}")
+
+    failures = [
+        (batch[index][0], batch[index][1], last_errors.get(index, "unknown error"))
+        for index in pending_indices
+    ]
+    return results, failures
 
 
 def generate_batch_prefixes(
@@ -691,7 +767,7 @@ def generate_batch_prefixes(
     retries: int,
     retry_wait: float,
     validate_prefix: bool,
-) -> dict[int, str]:
+) -> tuple[dict[int, str], list[tuple[int, str, str]]]:
     """仅调用 LLM，不写文件；供线程池并发执行。"""
     return generate_batch_with_retries(
         batch=batch,
@@ -719,9 +795,12 @@ def write_batch_records(
     split_counts: Counter[str],
     prefix_length_counts: Counter[str],
 ) -> int:
-    """在主线程单线程写入一批生成结果。"""
+    """在主线程单线程写入一批生成结果（仅写入 prefixes 中已有的样本）。"""
     written = 0
-    for index, (_, query) in enumerate(batch):
+    for index in sorted(prefixes):
+        if index < 0 or index >= len(batch):
+            continue
+        _, query = batch[index]
         filler_prefix = prefixes[index]
         split = split_for_query(
             query,
@@ -788,6 +867,7 @@ def main() -> int:
     skipped_short = 0
     skipped_duplicate = 0
     skipped_completed = 0
+    skipped_generation = 0
     completed_queries = set() if args.overwrite else load_completed_queries(args.output_dir)
     written = 0
 
@@ -856,7 +936,16 @@ def main() -> int:
             }
             for future in as_completed(future_to_batch):
                 batch = future_to_batch[future]
-                prefixes = future.result()
+                prefixes, failures = future.result()
+                if failures:
+                    skipped_generation += len(failures)
+                    for line_no, query, error in failures:
+                        print(
+                            f"skip sample after retries: line_no={line_no} query={query!r} error={error}",
+                            file=sys.stderr,
+                        )
+                if not prefixes:
+                    continue
                 prev_written = written
                 written += write_batch_records(
                     batch,
@@ -875,6 +964,7 @@ def main() -> int:
                 ):
                     print(
                         f"processed {written}/{pending_samples} samples; "
+                        f"skipped_generation={skipped_generation}; "
                         f"split_counts={dict(sorted(split_counts.items()))}; "
                         f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}",
                         flush=True,
@@ -884,6 +974,8 @@ def main() -> int:
             outfile.close()
 
     print(f"wrote {written}/{pending_samples} samples to {args.output_dir}")
+    if skipped_generation:
+        print(f"skipped_generation={skipped_generation} samples after retries")
     print(f"split_counts={dict(sorted(split_counts.items()))}")
     print(f"prefix_length_counts={dict(sorted(prefix_length_counts.items()))}")
     print_input_scan_summary(
