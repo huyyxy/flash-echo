@@ -20,13 +20,14 @@
     pip3 install -e ".[train]"
     python3 tools/training/download_minimind3_pretrained.py
 
-    python3 tools/training/train_minimind3_sft.py \\
-      --persona male_white_collar \\
-      --train data/filler_prefix/male_white_collar/train.jsonl \\
-      --valid data/filler_prefix/male_white_collar/valid.jsonl
+    # 默认读取 data/filler_prefix/<persona>/{train,valid}.jsonl
+    python3 tools/training/train_minimind3_sft.py --persona male_white_collar
+
+    # 显式指定数据路径（与上一行等价，便于复制粘贴）
+    python3 tools/training/train_minimind3_sft.py --persona male_white_collar --train data/filler_prefix/male_white_collar/train.jsonl --valid data/filler_prefix/male_white_collar/valid.jsonl
 
     # LoRA（需 pip install peft）
-    python3 tools/training/train_minimind3_sft.py --use-lora --lora-r 16
+    python3 tools/training/train_minimind3_sft.py --persona male_white_collar --use-lora --lora-r 16
 """
 
 from __future__ import annotations
