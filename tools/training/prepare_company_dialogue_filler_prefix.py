@@ -40,7 +40,6 @@ from prepare_sharegpt_filler_prefix import (
     SFT_USER_PREFIX,
     SFT_USER_PROMPT_SUFFIX,
     build_sft_record,
-    build_training_user_content,
     normalize_filler_prefix,
     normalize_text,
     split_for_query,
@@ -311,7 +310,7 @@ def dedupe_samples(samples: list[DialogueSample]) -> tuple[list[DialogueSample],
 def clean_user_content(content: str) -> str:
     if content.startswith(SFT_USER_PREFIX) and content.endswith(SFT_USER_PROMPT_SUFFIX):
         query = content[len(SFT_USER_PREFIX) : -len(SFT_USER_PROMPT_SUFFIX)].removesuffix("\n")
-        return build_training_user_content(remove_bracket_segments(query))
+        return remove_bracket_segments(query)
     return remove_bracket_segments(content)
 
 

@@ -22,7 +22,7 @@
       "conversations": [
         {
           "role": "user",
-          "content": "用户：帮我写一封请假邮件\n请生成一句可续写的短垫话前缀："
+          "content": "帮我写一封请假邮件"
         },
         {"role": "assistant", "content": "好的，我来帮你整理一下，"}
       ]
@@ -394,7 +394,7 @@ def query_key(query: str) -> str:
 
 
 def build_training_user_content(query: str) -> str:
-    return f"{SFT_USER_PREFIX}{query}\n{SFT_USER_PROMPT_SUFFIX}"
+    return query
 
 
 def build_sft_record(query: str, filler_prefix: str) -> dict[str, Any]:
@@ -424,10 +424,8 @@ def query_from_output_record(record: dict[str, Any]) -> str | None:
     content = first_turn.get("content")
     if not isinstance(content, str):
         return None
-    if not content.startswith(SFT_USER_PREFIX):
-        return None
-    if not content.endswith(SFT_USER_PROMPT_SUFFIX):
-        return None
+    if not (content.startswith(SFT_USER_PREFIX) and content.endswith(SFT_USER_PROMPT_SUFFIX)):
+        return normalize_text(content)
 
     query = content[len(SFT_USER_PREFIX) : -len(SFT_USER_PROMPT_SUFFIX)].removesuffix("\n")
     return normalize_text(query)
