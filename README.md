@@ -406,10 +406,12 @@ flash-echo-pipeline image push-all
 ```bash
 flash-echo-pipeline image build docker.cpu
 flash-echo-pipeline image build docker.base-cuda
+flash-echo-pipeline image build docker.base-cuda-cu128
 flash-echo-pipeline image build minimind3.train
 flash-echo-pipeline image build minimind3.export
 flash-echo-pipeline image build minimind3.infer
 flash-echo-pipeline image build qwen3_5_0_8b.train
+flash-echo-pipeline image build qwen3_5_0_8b.train-cu128
 flash-echo-pipeline image build qwen3_5_0_8b.export
 flash-echo-pipeline image build qwen3_5_0_8b.infer
 
@@ -443,6 +445,16 @@ flash-echo-pipeline run minimind3.train \
   --resume
 ```
 
+RTX 5090 / Blackwell 机器可使用 CUDA 12.8 训练镜像：
+
+```bash
+flash-echo-pipeline image build docker.base-cuda-cu128
+flash-echo-pipeline image build qwen3_5_0_8b.train-cu128
+flash-echo-pipeline run qwen3_5_0_8b.train-cu128 \
+  --persona male_white_collar \
+  --resume
+```
+
 强制重跑某个 step：
 
 ```bash
@@ -469,9 +481,11 @@ flash-echo-pipeline run minimind3.full \
 | `local.mac` | Mac 本地开发 |
 | `docker.cpu` | 数据清洗、审计、CPU 推理或导出 |
 | `docker.cuda` | Ubuntu + NVIDIA GPU 训练 |
+| `docker.base-cuda-cu128` | CUDA 12.8 / PyTorch cu128 基础镜像，适合 RTX 5090 / Blackwell |
 | `docker.minimind3-export` | MiniMind3 ONNX 导出 |
 | `docker.minimind3-infer` | MiniMind3 推理服务 |
 | `docker.qwen-train` | Qwen3.5-0.8B SFT 训练 |
+| `docker.qwen-train-cu128` | Qwen3.5-0.8B SFT 训练，适合 RTX 5090 / Blackwell |
 | `docker.qwen-export` | Qwen3.5-0.8B ONNX / ORT GenAI 导出 |
 | `docker.qwen-infer` | Qwen3.5-0.8B 推理服务 |
 

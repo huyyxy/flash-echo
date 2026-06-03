@@ -313,11 +313,13 @@ class PipelineRunner:
         order = {
             "base-cpu": 0,
             "base-cuda": 1,
-            "minimind3-train": 2,
-            "minimind3-export": 3,
-            "minimind3-infer": 4,
-            "qwen3_5_0_8b-train": 5,
-            "qwen3_5_0_8b-export": 6,
-            "qwen3_5_0_8b-infer": 7,
+            "base-cuda-cu128": 2,
+            "minimind3-train": 3,
+            "minimind3-export": 4,
+            "minimind3-infer": 5,
+            "qwen3_5_0_8b-train": 6,
+            "qwen3_5_0_8b-train-cu128": 7,
+            "qwen3_5_0_8b-export": 8,
+            "qwen3_5_0_8b-infer": 9,
         }
         return (order.get(tag, 500), image_ref)

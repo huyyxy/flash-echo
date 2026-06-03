@@ -38,6 +38,10 @@ def test_runner_lists_configured_models() -> None:
     assert runner.pipeline_steps("qwen3_5_0_8b", "download") == ["download_pretrained"]
     assert runner.pipeline_steps("minimind3", "train") == ["download_pretrained", "finetune"]
     assert runner.pipeline_steps("qwen3_5_0_8b", "train") == ["download_pretrained", "finetune"]
+    assert runner.pipeline_steps("qwen3_5_0_8b", "train-cu128") == [
+        "download_pretrained",
+        "finetune_cu128",
+    ]
     assert runner.pipeline_steps("minimind3", "export") == ["export_onnx"]
     assert runner.pipeline_steps("qwen3_5_0_8b", "export") == ["export_onnx"]
     assert runner.pipeline_steps("minimind3", "infer") == ["serve"]
@@ -83,6 +87,24 @@ def test_runner_can_build_runtime_image_command() -> None:
         "ccr.ccs.tencentyun.com/huyyxy/flash-echo:base-cpu",
         "-f",
         "docker/base/Dockerfile.cpu",
+        ".",
+    ]
+
+
+def test_runner_can_build_cu128_runtime_image_command() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    command = runner.build_image("docker.base-cuda-cu128", dry_run=True)
+
+    assert command == [
+        "docker",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "-t",
+        "ccr.ccs.tencentyun.com/huyyxy/flash-echo:base-cuda-cu128",
+        "-f",
+        "docker/base/Dockerfile.cuda-cu128",
         ".",
     ]
 
@@ -139,10 +161,12 @@ def test_runner_build_all_orders_base_images_first() -> None:
     assert tags == [
         "base-cpu",
         "base-cuda",
+        "base-cuda-cu128",
         "minimind3-train",
         "minimind3-export",
         "minimind3-infer",
         "qwen3_5_0_8b-train",
+        "qwen3_5_0_8b-train-cu128",
         "qwen3_5_0_8b-export",
         "qwen3_5_0_8b-infer",
     ]
@@ -157,10 +181,12 @@ def test_runner_pull_all_orders_base_images_first() -> None:
     assert tags == [
         "base-cpu",
         "base-cuda",
+        "base-cuda-cu128",
         "minimind3-train",
         "minimind3-export",
         "minimind3-infer",
         "qwen3_5_0_8b-train",
+        "qwen3_5_0_8b-train-cu128",
         "qwen3_5_0_8b-export",
         "qwen3_5_0_8b-infer",
     ]
@@ -182,6 +208,25 @@ def test_qwen_train_dry_run_uses_filler_prefix_sft_script() -> None:
     assert result.status == "dry-run"
     assert "tools/training/train_qwen3_5_sft.py" in result.command
     assert "data/filler_prefix/male_white_collar/train.jsonl" in result.command
+
+
+def test_qwen_cu128_train_dry_run_uses_cu128_runtime() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    result = runner.run_step(
+        model="qwen3_5_0_8b",
+        step_name="finetune-cu128",
+        persona="male_white_collar",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert result.status == "dry-run"
+    assert result.runtime == "docker.qwen-train-cu128"
+    assert "ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-train-cu128" in result.command
+    assert "tools/training/train_qwen3_5_sft.py" in result.command
 
 
 def test_minimind3_upload_checkpoint_dry_run_uses_cos_prefix() -> None:

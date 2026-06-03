@@ -43,6 +43,9 @@ pipelines:
   train:
     - download_pretrained
     - finetune
+  train_cu128:
+    - download_pretrained
+    - finetune_cu128
   export:
     - export_onnx
   upload_checkpoint:
@@ -65,6 +68,16 @@ pipelines:
     - download_pretrained
     - build_train_image
     - finetune
+    - build_export_image
+    - export_onnx
+    - build_infer_image
+    - serve
+  full_cu128:
+    - clean_data
+    - audit_data
+    - download_pretrained
+    - build_train_image_cu128
+    - finetune_cu128
     - build_export_image
     - export_onnx
     - build_infer_image
@@ -131,8 +144,57 @@ steps:
     outputs: []
     resume: false
 
+  build_train_image_cu128:
+    runtime: local
+    image: qwen3_5_0_8b.train-cu128
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-train-cu128
+      - -f
+      - docker/qwen3_5_0_8b/Dockerfile.train-cu128
+      - .
+    outputs: []
+    resume: false
+
   finetune:
     runtime: docker.qwen-train
+    command:
+      - python3
+      - tools/training/train_qwen3_5_sft.py
+      - --persona
+      - "{persona}"
+      - --train
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - --valid
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - --test
+      - "{paths.cleaned_data_dir}/test.jsonl"
+      - --base-model
+      - "{paths.pretrained_model}"
+      - --output-dir
+      - "{paths.checkpoint_root}"
+      - --model-version
+      - "qwen3_5_0_8b-filler-{persona}-{version}"
+      - --epochs
+      - "{train.epochs}"
+      - --batch-size
+      - "{train.batch_size}"
+      - --eval-batch-size
+      - "{train.eval_batch_size}"
+    inputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.pretrained_model}/config.json"
+    outputs:
+      - "{paths.checkpoint}/model_card.json"
+    resume: true
+
+  finetune_cu128:
+    runtime: docker.qwen-train-cu128
     command:
       - python3
       - tools/training/train_qwen3_5_sft.py
