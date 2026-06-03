@@ -87,11 +87,41 @@ def test_runner_can_push_runtime_image_command() -> None:
     ]
 
 
+def test_runner_can_pull_runtime_image_command() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    command = runner.pull_image("docker.cpu", dry_run=True)
+
+    assert command == [
+        "docker",
+        "pull",
+        "ccr.ccs.tencentyun.com/huyyxy/flash-echo:base-cpu",
+    ]
+
+
 def test_runner_build_all_orders_base_images_first() -> None:
     runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
 
     commands = runner.build_all_images(dry_run=True)
     tags = [command[command.index("-t") + 1].rsplit(":", 1)[-1] for command in commands]
+
+    assert tags == [
+        "base-cpu",
+        "base-cuda",
+        "minimind3-train",
+        "minimind3-export",
+        "minimind3-infer",
+        "qwen3_5_0_8b-train",
+        "qwen3_5_0_8b-export",
+        "qwen3_5_0_8b-infer",
+    ]
+
+
+def test_runner_pull_all_orders_base_images_first() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    commands = runner.pull_all_images(dry_run=True)
+    tags = [command[-1].rsplit(":", 1)[-1] for command in commands]
 
     assert tags == [
         "base-cpu",

@@ -146,6 +146,12 @@ printf '%s\n' "$TENCENT_CCR_PASSWORD" | docker login ccr.ccs.tencentyun.com --us
 flash-echo-pipeline image build-all
 ```
 
+一键拉取全部镜像：
+
+```bash
+flash-echo-pipeline image pull-all
+```
+
 一键推送全部镜像：
 
 ```bash
@@ -164,6 +170,7 @@ flash-echo-pipeline image build qwen3_5_0_8b.train
 flash-echo-pipeline image build qwen3_5_0_8b.export
 flash-echo-pipeline image build qwen3_5_0_8b.infer
 
+flash-echo-pipeline image pull qwen3_5_0_8b.infer
 flash-echo-pipeline image push qwen3_5_0_8b.infer
 ```
 

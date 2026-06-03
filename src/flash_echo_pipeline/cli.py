@@ -38,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
     build_parser_.add_argument("--dry-run", action="store_true")
     build_all_parser_ = image_subparsers.add_parser("build-all", help="Build every configured image.")
     build_all_parser_.add_argument("--dry-run", action="store_true")
+    pull_parser_ = image_subparsers.add_parser("pull", help="Pull a configured image.")
+    pull_parser_.add_argument("image")
+    pull_parser_.add_argument("--dry-run", action="store_true")
+    pull_all_parser_ = image_subparsers.add_parser("pull-all", help="Pull every configured image.")
+    pull_all_parser_.add_argument("--dry-run", action="store_true")
     push_parser_ = image_subparsers.add_parser("push", help="Push a configured image.")
     push_parser_.add_argument("image")
     push_parser_.add_argument("--dry-run", action="store_true")
@@ -89,6 +94,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         if args.command == "image" and args.image_command == "build-all":
             runner.build_all_images(dry_run=args.dry_run)
+            return 0
+
+        if args.command == "image" and args.image_command == "pull":
+            runner.pull_image(args.image, dry_run=args.dry_run)
+            return 0
+
+        if args.command == "image" and args.image_command == "pull-all":
+            runner.pull_all_images(dry_run=args.dry_run)
             return 0
 
         if args.command == "image" and args.image_command == "push":

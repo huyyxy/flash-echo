@@ -163,6 +163,24 @@ class PipelineRunner:
             commands.append(self.build_image(image_ref, dry_run=dry_run))
         return commands
 
+    def pull_image(self, image_ref: str, *, dry_run: bool) -> list[str]:
+        image = self._resolve_image(image_ref)
+        command = ["docker", "pull", image]
+        if dry_run:
+            print(self._format_command(command))
+            return command
+
+        return_code = subprocess.run(command, cwd=self.paths.root, check=False).returncode
+        if return_code != 0:
+            raise RuntimeError(f"image pull failed for {image_ref}")
+        return command
+
+    def pull_all_images(self, *, dry_run: bool) -> list[list[str]]:
+        commands = []
+        for image_ref in self.list_image_refs():
+            commands.append(self.pull_image(image_ref, dry_run=dry_run))
+        return commands
+
     def push_image(self, image_ref: str, *, dry_run: bool) -> list[str]:
         image = self._resolve_image(image_ref)
         command = ["docker", "push", image]
