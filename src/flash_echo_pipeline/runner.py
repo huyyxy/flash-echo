@@ -98,6 +98,12 @@ class PipelineRunner:
         rendered_step = render_value(steps[step_name], context)
         runtime_name = runtime_override or rendered_step.get("runtime", "local")
         runtime_config = self.load_runtime(runtime_name)
+        if "env" in rendered_step:
+            runtime_config = dict(runtime_config)
+            runtime_config["env"] = {
+                **runtime_config.get("env", {}),
+                **rendered_step["env"],
+            }
         runtime = self._runtime(runtime_config)
         step_command = [str(item) for item in rendered_step["command"]]
         full_command = runtime.command(step_command)

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flash_echo_pipeline.config import ProjectPaths, persona_dash, render_value
+from flash_echo.inference.persona_router import PersonaModelRouter
+from flash_echo_pipeline.config import ProjectPaths, load_yaml, persona_dash, render_value
 from flash_echo_pipeline.runtime.docker import DockerRuntime
 from flash_echo_pipeline.runner import PipelineRunner
 
@@ -14,9 +15,10 @@ def test_render_value_resolves_nested_pipeline_variables() -> None:
     context = {
         "persona": "male_white_collar",
         "persona_dash": persona_dash("male_white_collar"),
+        "version": "v1.0.0",
         "paths": {
             "cleaned_data_dir": "data/filler_prefix/{persona}",
-            "deploy_dir": "models/deploy/minimind3-filler-{persona_dash}-v1.0.0",
+            "deploy_dir": "models/deploy/minimind3-filler-{persona_dash}-{version}",
         },
     }
     resolved_context = render_value(context, context)
@@ -221,3 +223,72 @@ def test_qwen_download_deploy_dry_run_uses_cos_prefix() -> None:
     assert "download" in result.command
     assert "models/deploy/qwen3_5_0_8b-filler-company-v1.0.0-onnx" in result.command
     assert "flash-echo/qwen3_5_0_8b/v1.0.0/company/deploy" in result.command
+
+
+def test_pipeline_version_renders_training_and_storage_paths(monkeypatch) -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+    config = load_yaml(PROJECT_ROOT / "configs/pipelines/qwen3_5_0_8b.yaml")
+    config["version"] = "v2.3.4"
+    monkeypatch.setattr(runner, "load_pipeline", lambda model: config)
+
+    train_result = runner.run_step(
+        model="qwen3_5_0_8b",
+        step_name="finetune",
+        persona="company",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+    download_result = runner.run_step(
+        model="qwen3_5_0_8b",
+        step_name="download_deploy",
+        persona="company",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert "models/checkpoints/qwen3_5_0_8b-filler-company-v2.3.4" in train_result.command
+    assert "qwen3_5_0_8b-filler-company-v2.3.4" in train_result.command
+    assert "models/deploy/qwen3_5_0_8b-filler-company-v2.3.4-onnx" in download_result.command
+    assert "flash-echo/qwen3_5_0_8b/v2.3.4/company/deploy" in download_result.command
+
+
+def test_minimind3_infer_receives_pipeline_model_version(monkeypatch) -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+    config = load_yaml(PROJECT_ROOT / "configs/pipelines/minimind3.yaml")
+    config["version"] = "v2.3.4"
+    monkeypatch.setattr(runner, "load_pipeline", lambda model: config)
+
+    result = runner.run_step(
+        model="minimind3",
+        step_name="serve",
+        persona="male_white_collar",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert "-e" in result.command
+    assert "FLASH_ECHO_MODEL_VERSION=v2.3.4" in result.command
+
+
+def test_persona_router_renders_model_version_template(tmp_path: Path) -> None:
+    router = PersonaModelRouter.from_config(
+        {
+            "version": "model-router-test",
+            "routes": {
+                "company": {
+                    "model_version": "minimind3-filler-company-{version}",
+                    "enabled": True,
+                }
+            },
+        },
+        deploy_root=tmp_path,
+        template_context={"version": "v2.3.4"},
+    )
+
+    assert router._routes["company"].model_version == "minimind3-filler-company-v2.3.4"

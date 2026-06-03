@@ -6,9 +6,9 @@ paths:
   raw_data: data/raw/sft_t2t_mini.jsonl
   cleaned_data_dir: data/filler_prefix/{persona}
   pretrained_model: models/pretrained/Qwen-Qwen3.5-0.8B
-  checkpoint_root: models/checkpoints/qwen3_5_0_8b-filler-{persona}-v1.0.0
-  checkpoint: models/checkpoints/qwen3_5_0_8b-filler-{persona}-v1.0.0/best
-  deploy_dir: models/deploy/qwen3_5_0_8b-filler-{persona_dash}-v1.0.0-onnx
+  checkpoint_root: models/checkpoints/qwen3_5_0_8b-filler-{persona}-{version}
+  checkpoint: models/checkpoints/qwen3_5_0_8b-filler-{persona}-{version}/best
+  deploy_dir: models/deploy/qwen3_5_0_8b-filler-{persona_dash}-{version}-onnx
 
 cos:
   bucket_url: https://weights-1305049745.cos.ap-shanghai.myqcloud.com
@@ -148,6 +148,8 @@ steps:
       - "{paths.pretrained_model}"
       - --output-dir
       - "{paths.checkpoint_root}"
+      - --model-version
+      - "qwen3_5_0_8b-filler-{persona}-{version}"
       - --epochs
       - "{train.epochs}"
       - --batch-size
@@ -220,6 +222,8 @@ steps:
       - "{paths.checkpoint}"
       - --output-dir
       - "{paths.deploy_dir}"
+      - --model-version
+      - "qwen3_5_0_8b-filler-{persona_dash}-{version}-onnx"
       - --export-backend
       - "{export.backend}"
       - --precision

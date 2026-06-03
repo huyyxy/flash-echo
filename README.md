@@ -140,9 +140,11 @@ flash-echo-pipeline run qwen3_5_0_8b.export \
 MiniMind3 使用 `data/filler_prefix/<persona>/` 下的 `train.jsonl`、`valid.jsonl`、`test.jsonl` 进行 SFT 微调。默认产物：
 
 ```text
-models/checkpoints/minimind3-filler-<persona>-v1.0.0/best
-models/deploy/minimind3-filler-<persona-dash>-v1.0.0/
+models/checkpoints/minimind3-filler-<persona>-<version>/best
+models/deploy/minimind3-filler-<persona-dash>-<version>/
 ```
+
+`<version>` 来自 `configs/pipelines/minimind3.yaml` 的 `version` 字段，默认是 `v1.0.0`。
 
 数据准备：
 
@@ -231,9 +233,11 @@ flash-echo-pipeline run minimind3.full \
 Qwen3.5-0.8B 也支持使用 `data/filler_prefix/<persona>/` 下的 `train.jsonl`、`valid.jsonl`、`test.jsonl` 进行 SFT 微调。默认训练产物会保存到：
 
 ```text
-models/checkpoints/qwen3_5_0_8b-filler-<persona>-v1.0.0/best
-models/deploy/qwen3_5_0_8b-filler-<persona-dash>-v1.0.0-onnx/
+models/checkpoints/qwen3_5_0_8b-filler-<persona>-<version>/best
+models/deploy/qwen3_5_0_8b-filler-<persona-dash>-<version>-onnx/
 ```
+
+`<version>` 来自 `configs/pipelines/qwen3_5_0_8b.yaml` 的 `version` 字段，默认是 `v1.0.0`。
 
 导出阶段默认读取 best checkpoint，并输出 persona 专属 ONNX / ORT GenAI deploy bundle。
 

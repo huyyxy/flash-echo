@@ -6,9 +6,9 @@ paths:
   raw_data: data/raw/sft_t2t_mini.jsonl
   cleaned_data_dir: data/filler_prefix/{persona}
   pretrained_model: models/pretrained/jingyaogong-minimind-3
-  checkpoint_root: models/checkpoints/minimind3-filler-{persona}-v1.0.0
-  checkpoint: models/checkpoints/minimind3-filler-{persona}-v1.0.0/best
-  deploy_dir: models/deploy/minimind3-filler-{persona_dash}-v1.0.0
+  checkpoint_root: models/checkpoints/minimind3-filler-{persona}-{version}
+  checkpoint: models/checkpoints/minimind3-filler-{persona}-{version}/best
+  deploy_dir: models/deploy/minimind3-filler-{persona_dash}-{version}
 
 cos:
   bucket_url: https://weights-1305049745.cos.ap-shanghai.myqcloud.com
@@ -135,6 +135,8 @@ steps:
       - "{paths.pretrained_model}"
       - --output-dir
       - "{paths.checkpoint_root}"
+      - --model-version
+      - "minimind3-filler-{persona}-{version}"
       - --epochs
       - "{train.epochs}"
       - --batch-size
@@ -193,6 +195,8 @@ steps:
       - "{paths.checkpoint}"
       - --output-dir
       - "{paths.deploy_dir}"
+      - --model-version
+      - "minimind3-filler-{persona_dash}-{version}"
     inputs:
       - "{paths.checkpoint}"
     outputs:
@@ -269,6 +273,8 @@ steps:
 
   serve:
     runtime: docker.minimind3-infer
+    env:
+      FLASH_ECHO_MODEL_VERSION: "{version}"
     command:
       - flash-echo
     inputs:

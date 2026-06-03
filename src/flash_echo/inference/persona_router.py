@@ -20,7 +20,13 @@ class PersonaModelRouter:
         self._routes = routes
 
     @classmethod
-    def from_config(cls, payload: dict[str, Any], *, deploy_root: Path) -> PersonaModelRouter:
+    def from_config(
+        cls,
+        payload: dict[str, Any],
+        *,
+        deploy_root: Path,
+        template_context: dict[str, str] | None = None,
+    ) -> PersonaModelRouter:
         version = str(payload.get("version", "model-router-v1"))
         raw_routes = payload.get("routes", {})
         if not isinstance(raw_routes, dict):
@@ -31,6 +37,8 @@ class PersonaModelRouter:
             if not isinstance(route_cfg, dict):
                 continue
             model_version = str(route_cfg["model_version"])
+            if template_context:
+                model_version = model_version.format(**template_context)
             bundle_dir = deploy_root / model_version
             routes[persona_tag] = PersonaRoute(
                 persona_tag=persona_tag,

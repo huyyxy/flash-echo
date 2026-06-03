@@ -34,6 +34,7 @@ def build_service() -> FillerReplyService:
     root = project_root()
     config_dir = Path(os.getenv("FILLER_CONFIG_DIR", root / "configs"))
     deploy_root = Path(os.getenv("FILLER_DEPLOY_ROOT", root / "models" / "deploy"))
+    model_artifact_version = os.getenv("FLASH_ECHO_MODEL_VERSION", "v1.0.0")
 
     static_gate = StaticReplyGate.from_config(
         load_json_config(config_dir / "static_rules.v1.json", DEFAULT_STATIC_RULES)
@@ -44,9 +45,10 @@ def build_service() -> FillerReplyService:
     persona_router = PersonaModelRouter.from_config(
         load_json_config(
             config_dir / "model_router.v1.json",
-            _default_model_router(deploy_root),
+            _default_model_router(deploy_root, model_artifact_version),
         ),
         deploy_root=deploy_root,
+        template_context={"version": model_artifact_version},
     )
 
     return FillerReplyService(
@@ -65,7 +67,7 @@ def build_service() -> FillerReplyService:
     )
 
 
-def _default_model_router(deploy_root: Path) -> dict:
+def _default_model_router(deploy_root: Path, model_artifact_version: str) -> dict:
     personas = (
         "female_receptionist",
         "male_white_collar",
@@ -74,7 +76,7 @@ def _default_model_router(deploy_root: Path) -> dict:
     )
     routes = {}
     for persona in personas:
-        model_version = f"minimind3-filler-{persona.replace('_', '-')}-v1.0.0"
+        model_version = f"minimind3-filler-{persona.replace('_', '-')}-{model_artifact_version}"
         bundle_dir = deploy_root / model_version
         if (bundle_dir / "model.onnx").exists() and (
             bundle_dir / "inference_config.json"
