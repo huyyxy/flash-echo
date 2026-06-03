@@ -1,2 +1,0 @@
-[console_scripts]
-flash-echo = filler_words.app:main
