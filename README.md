@@ -56,8 +56,6 @@ pip3 install -e ".[train]"
 pip3 install -e ".[train,infer]"
 ```
 
-兼容旧命令：`pip3 install -e ".[ml]"` 等价于安装训练 + 推理全部 ML 依赖。
-
 ### 流水线 CLI
 
 推荐在项目虚拟环境中安装（editable 可正常工作）：
