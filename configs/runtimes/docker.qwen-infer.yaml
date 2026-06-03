@@ -1,0 +1,18 @@
+name: docker.qwen-infer
+type: docker
+image: ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-infer
+dockerfile: docker/qwen3_5_0_8b/Dockerfile.infer
+platform: linux/amd64
+gpu: none
+workdir: /workspace
+ports:
+  - host: 8080
+    container: 8080
+mounts:
+  - source: .
+    target: /workspace
+env:
+  PYTHONPATH: /workspace/src
+  HF_HOME: /workspace/models/.cache/huggingface
+  TRANSFORMERS_CACHE: /workspace/models/.cache/huggingface
+  ORTGENAI_CACHE: /workspace/models/.cache/onnxruntime-genai

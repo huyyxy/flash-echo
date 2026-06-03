@@ -1,0 +1,28 @@
+FROM python:3.11-slim-trixie
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /workspace
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        ca-certificates \
+        libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m pip install --upgrade pip setuptools wheel packaging
+
+COPY pyproject.toml README.md /workspace/
+COPY src /workspace/src
+COPY configs /workspace/configs
+
+RUN python -m pip install -e "." \
+    "onnxruntime>=1.18" \
+    "transformers>=4.51,<5"
+
+EXPOSE 8000
+
+CMD ["flash-echo"]

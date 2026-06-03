@@ -1,0 +1,14 @@
+name: docker.cuda
+type: docker
+image: ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-train
+dockerfile: docker/minimind3/Dockerfile.train
+platform: linux/amd64
+gpu: all
+workdir: /workspace
+mounts:
+  - source: .
+    target: /workspace
+env:
+  PYTHONPATH: /workspace/src
+  HF_HOME: /workspace/models/.cache/huggingface
+  TRANSFORMERS_CACHE: /workspace/models/.cache/huggingface

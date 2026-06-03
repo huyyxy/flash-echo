@@ -1,0 +1,14 @@
+name: docker.qwen-train
+type: docker
+image: ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-train
+dockerfile: docker/qwen3_5_0_8b/Dockerfile.train
+platform: linux/amd64
+gpu: all
+workdir: /workspace
+mounts:
+  - source: .
+    target: /workspace
+env:
+  PYTHONPATH: /workspace/src:/workspace/tools/training
+  HF_HOME: /workspace/models/.cache/huggingface
+  TRANSFORMERS_CACHE: /workspace/models/.cache/huggingface

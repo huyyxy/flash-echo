@@ -7,6 +7,7 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.111",
     "pydantic>=2.7",
+    "pyyaml>=6.0",
     "uvicorn[standard]>=0.30",
 ]
 
@@ -35,6 +36,7 @@ ml = [
 
 [project.scripts]
 flash-echo = "filler_words.app:main"
+flash-echo-pipeline = "flash_echo_pipeline.cli:main"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

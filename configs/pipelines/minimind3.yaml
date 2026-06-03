@@ -1,0 +1,189 @@
+model: minimind3
+default_persona: male_white_collar
+version: v1.0.0
+
+paths:
+  raw_data: data/raw/sft_t2t_mini.jsonl
+  cleaned_data_dir: data/filler_prefix/{persona}
+  pretrained_model: models/pretrained/jingyaogong-minimind-3
+  checkpoint_root: models/checkpoints/minimind3-filler-{persona}-v1.0.0
+  checkpoint: models/checkpoints/minimind3-filler-{persona}-v1.0.0/best
+  deploy_dir: models/deploy/minimind3-filler-{persona_dash}-v1.0.0
+
+train:
+  epochs: 3
+  batch_size: 8
+  eval_batch_size: 16
+  use_lora: false
+
+pipelines:
+  data:
+    - clean_data
+    - audit_data
+  train:
+    - download_pretrained
+    - finetune
+  export:
+    - build_export_image
+    - export_onnx
+  infer:
+    - serve
+  full:
+    - clean_data
+    - audit_data
+    - download_pretrained
+    - build_train_image
+    - finetune
+    - build_export_image
+    - export_onnx
+    - build_infer_image
+    - serve
+
+steps:
+  clean_data:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/training/prepare_sharegpt_filler_prefix.py
+      - --input
+      - "{paths.raw_data}"
+      - --output-dir
+      - "{paths.cleaned_data_dir}"
+      - --persona
+      - "{persona}"
+    inputs:
+      - "{paths.raw_data}"
+    outputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.cleaned_data_dir}/test.jsonl"
+    resume: true
+
+  audit_data:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/training/audit_filler_prefix.py
+      - --data-dir
+      - "{paths.cleaned_data_dir}"
+    inputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.cleaned_data_dir}/test.jsonl"
+    outputs: []
+    resume: false
+
+  download_pretrained:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/training/download_minimind3_pretrained.py
+    outputs:
+      - "{paths.pretrained_model}"
+    resume: true
+
+  build_train_image:
+    runtime: local
+    image: minimind3.train
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-train
+      - -f
+      - docker/minimind3/Dockerfile.train
+      - .
+    outputs: []
+    resume: false
+
+  finetune:
+    runtime: docker.cuda
+    command:
+      - python3
+      - tools/training/train_minimind3_sft.py
+      - --persona
+      - "{persona}"
+      - --train
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - --valid
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - --test
+      - "{paths.cleaned_data_dir}/test.jsonl"
+      - --base-model
+      - "{paths.pretrained_model}"
+      - --output-dir
+      - "{paths.checkpoint_root}"
+      - --epochs
+      - "{train.epochs}"
+      - --batch-size
+      - "{train.batch_size}"
+      - --eval-batch-size
+      - "{train.eval_batch_size}"
+    inputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.pretrained_model}"
+    outputs:
+      - "{paths.checkpoint}/model_card.json"
+    resume: true
+
+  export_onnx:
+    runtime: docker.minimind3-export
+    command:
+      - python3
+      - tools/export/export_minimind3_onnx.py
+      - --persona
+      - "{persona}"
+      - --checkpoint
+      - "{paths.checkpoint}"
+      - --output-dir
+      - "{paths.deploy_dir}"
+    inputs:
+      - "{paths.checkpoint}"
+    outputs:
+      - "{paths.deploy_dir}/model.onnx"
+      - "{paths.deploy_dir}/inference_config.json"
+    resume: true
+
+  build_export_image:
+    runtime: local
+    image: minimind3.export
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-export
+      - -f
+      - docker/minimind3/Dockerfile.export
+      - .
+    outputs: []
+    resume: false
+
+  build_infer_image:
+    runtime: local
+    image: minimind3.infer
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-infer
+      - -f
+      - docker/minimind3/Dockerfile.infer
+      - .
+    outputs: []
+    resume: false
+
+  serve:
+    runtime: docker.cpu
+    command:
+      - flash-echo
+    inputs:
+      - "{paths.deploy_dir}/model.onnx"
+    outputs: []
+    resume: false

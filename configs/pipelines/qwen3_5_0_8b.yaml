@@ -1,0 +1,218 @@
+model: qwen3_5_0_8b
+default_persona: male_white_collar
+version: v1.0.0
+
+paths:
+  raw_data: data/raw/sft_t2t_mini.jsonl
+  cleaned_data_dir: data/filler_prefix/{persona}
+  pretrained_model: models/pretrained/Qwen-Qwen3.5-0.8B
+  checkpoint_root: models/checkpoints/qwen3_5_0_8b-filler-{persona}-v1.0.0
+  checkpoint: models/checkpoints/qwen3_5_0_8b-filler-{persona}-v1.0.0/best
+  deploy_dir: models/deploy/qwen3_5_0_8b-filler-{persona_dash}-v1.0.0-onnx
+
+train:
+  epochs: 3
+  batch_size: 4
+  eval_batch_size: 8
+  use_lora: false
+  lora_r: 16
+
+export:
+  precision: fp32
+  execution_provider: cpu
+  backend: auto
+
+infer:
+  host: 0.0.0.0
+  port: 8080
+  execution_provider: cpu
+
+pipelines:
+  data:
+    - clean_data
+    - audit_data
+  download:
+    - download_pretrained
+  train:
+    - download_pretrained
+    - build_train_image
+    - finetune
+  export:
+    - build_export_image
+    - export_onnx
+  infer:
+    - build_infer_image
+    - serve
+  full:
+    - clean_data
+    - audit_data
+    - download_pretrained
+    - build_train_image
+    - finetune
+    - build_export_image
+    - export_onnx
+    - build_infer_image
+    - serve
+
+steps:
+  clean_data:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/training/prepare_sharegpt_filler_prefix.py
+      - --input
+      - "{paths.raw_data}"
+      - --output-dir
+      - "{paths.cleaned_data_dir}"
+      - --persona
+      - "{persona}"
+    inputs:
+      - "{paths.raw_data}"
+    outputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.cleaned_data_dir}/test.jsonl"
+    resume: true
+
+  audit_data:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/training/audit_filler_prefix.py
+      - --data-dir
+      - "{paths.cleaned_data_dir}"
+    inputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.cleaned_data_dir}/test.jsonl"
+    outputs: []
+    resume: false
+
+  download_pretrained:
+    runtime: docker.qwen-export
+    command:
+      - python3
+      - tools/training/download_qwen3_5_pretrained.py
+      - --output-dir
+      - "{paths.pretrained_model}"
+    outputs:
+      - "{paths.pretrained_model}/config.json"
+    resume: true
+
+  build_train_image:
+    runtime: local
+    image: qwen3_5_0_8b.train
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-train
+      - -f
+      - docker/qwen3_5_0_8b/Dockerfile.train
+      - .
+    outputs: []
+    resume: false
+
+  finetune:
+    runtime: docker.qwen-train
+    command:
+      - python3
+      - tools/training/train_qwen3_5_sft.py
+      - --persona
+      - "{persona}"
+      - --train
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - --valid
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - --test
+      - "{paths.cleaned_data_dir}/test.jsonl"
+      - --base-model
+      - "{paths.pretrained_model}"
+      - --output-dir
+      - "{paths.checkpoint_root}"
+      - --epochs
+      - "{train.epochs}"
+      - --batch-size
+      - "{train.batch_size}"
+      - --eval-batch-size
+      - "{train.eval_batch_size}"
+    inputs:
+      - "{paths.cleaned_data_dir}/train.jsonl"
+      - "{paths.cleaned_data_dir}/valid.jsonl"
+      - "{paths.pretrained_model}/config.json"
+    outputs:
+      - "{paths.checkpoint}/model_card.json"
+    resume: true
+
+  build_export_image:
+    runtime: local
+    image: qwen3_5_0_8b.export
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-export
+      - -f
+      - docker/qwen3_5_0_8b/Dockerfile.export
+      - .
+    outputs: []
+    resume: false
+
+  export_onnx:
+    runtime: docker.qwen-export
+    command:
+      - python3
+      - tools/export/export_qwen3_5_onnx.py
+      - --model-dir
+      - "{paths.checkpoint}"
+      - --output-dir
+      - "{paths.deploy_dir}"
+      - --export-backend
+      - "{export.backend}"
+      - --precision
+      - "{export.precision}"
+      - --execution-provider
+      - "{export.execution_provider}"
+    inputs:
+      - "{paths.checkpoint}/model_card.json"
+    outputs:
+      - "{paths.deploy_dir}/genai_config.json"
+    resume: true
+
+  build_infer_image:
+    runtime: local
+    image: qwen3_5_0_8b.infer
+    command:
+      - docker
+      - build
+      - --platform
+      - linux/amd64
+      - -t
+      - ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-infer
+      - -f
+      - docker/qwen3_5_0_8b/Dockerfile.infer
+      - .
+    outputs: []
+    resume: false
+
+  serve:
+    runtime: docker.qwen-infer
+    command:
+      - python3
+      - tools/inference/serve_qwen3_5_onnx_openai.py
+      - --model-dir
+      - "{paths.deploy_dir}"
+      - --host
+      - "{infer.host}"
+      - --port
+      - "{infer.port}"
+      - --execution-provider
+      - "{infer.execution_provider}"
+    inputs:
+      - "{paths.deploy_dir}/genai_config.json"
+    outputs: []
+    resume: false

@@ -1,0 +1,14 @@
+FROM ccr.ccs.tencentyun.com/huyyxy/flash-echo:base-cuda
+
+WORKDIR /workspace
+
+RUN python3 -m pip install --pre \
+    "transformers>=5.3" \
+    "huggingface-hub" \
+    "safetensors" \
+    "tokenizers" \
+    "accelerate" \
+    "jinja2" \
+    "peft"
+
+CMD ["bash"]

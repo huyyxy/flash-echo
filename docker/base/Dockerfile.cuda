@@ -1,0 +1,31 @@
+FROM nvidia/cuda:12.4.1-cudnn-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HOME=/workspace/models/.cache/huggingface \
+    TRANSFORMERS_CACHE=/workspace/models/.cache/huggingface
+
+WORKDIR /workspace
+
+RUN apt-get update -o Acquire::Retries=5 \
+    && apt-get install -y --no-install-recommends -o Acquire::Retries=5 \
+        bash \
+        ca-certificates \
+        curl \
+        git \
+        python3 \
+        python3-pip \
+        python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m pip install --upgrade pip setuptools wheel packaging
+RUN python3 -m pip install --index-url https://download.pytorch.org/whl/cu124 torch
+
+COPY pyproject.toml README.md /workspace/
+COPY src /workspace/src
+
+RUN python3 -m pip install -e ".[dev,train]"
+
+CMD ["bash"]

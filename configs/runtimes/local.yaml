@@ -1,0 +1,5 @@
+name: local
+type: local
+workdir: .
+env:
+  PYTHONPATH: src

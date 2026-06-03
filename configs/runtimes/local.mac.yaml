@@ -1,0 +1,5 @@
+name: local.mac
+type: local
+workdir: .
+env:
+  PYTHONPATH: src

@@ -1,0 +1,23 @@
+FROM ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-infer
+
+ENV PIP_NO_CACHE_DIR=1 \
+    HF_HOME=/workspace/models/.cache/huggingface \
+    TRANSFORMERS_CACHE=/workspace/models/.cache/huggingface \
+    ORTGENAI_CACHE=/workspace/models/.cache/onnxruntime-genai
+
+WORKDIR /workspace
+
+RUN python -m pip install --pre \
+    "transformers>=5.3" \
+    "onnxruntime>=1.18" \
+    "onnxruntime-genai" \
+    "huggingface-hub" \
+    "tokenizers" \
+    "safetensors" \
+    "fastapi" \
+    "pydantic" \
+    "uvicorn[standard]"
+
+EXPOSE 8080
+
+CMD ["bash"]

@@ -1,0 +1,7 @@
+FROM ccr.ccs.tencentyun.com/huyyxy/flash-echo:base-cuda
+
+WORKDIR /workspace
+
+RUN python3 -m pip install peft
+
+CMD ["bash"]
