@@ -31,9 +31,9 @@ tests/                   单元测试与 API 测试
 ### 推理服务（线上 / 本地开发）
 
 ```bash
-python -m venv .venv-infer
+python3 -m venv .venv-infer
 source .venv-infer/bin/activate
-pip install -e ".[dev,infer]"
+pip3 install -e ".[dev,infer]"
 ```
 
 仅需 FastAPI 与 ONNX Runtime 相关依赖，**不需要** PyTorch。
@@ -41,11 +41,11 @@ pip install -e ".[dev,infer]"
 ### 训练环境
 
 ```bash
-python -m venv .venv-train
+python3 -m venv .venv-train
 source .venv-train/bin/activate
-pip install -e ".[train]"
-# LoRA 微调额外需要：pip install peft
-# ModelScope 下载额外需要：pip install modelscope
+pip3 install -e ".[train]"
+# LoRA 微调额外需要：pip3 install peft
+# ModelScope 下载额外需要：pip3 install modelscope
 ```
 
 ### ONNX 导出
@@ -53,7 +53,7 @@ pip install -e ".[train]"
 导出脚本同时需要训练与推理依赖：
 
 ```bash
-pip install -e ".[train,infer]"
+pip3 install -e ".[train,infer]"
 ```
 
 兼容旧命令：`pip install -e ".[ml]"` 等价于安装训练 + 推理全部 ML 依赖。
@@ -63,7 +63,7 @@ pip install -e ".[train,infer]"
 流水线 CLI 随项目安装：
 
 ```bash
-pip install -e ".[dev]"
+pip3 install -e ".[dev]"
 flash-echo-pipeline list
 ```
 
