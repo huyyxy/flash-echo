@@ -35,8 +35,8 @@ ml = [
 ]
 
 [project.scripts]
-flash-echo = "filler_words.app:main"
-flash-echo-pipeline = "flash_echo_pipeline.cli:main"
+flash-echo = "flash_echo_bootstrap:launch_filler_app"
+flash-echo-pipeline = "flash_echo_bootstrap:launch_pipeline_cli"
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]
@@ -44,6 +44,13 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.setuptools]
+py-modules = ["flash_echo_bootstrap"]
+
+[tool.setuptools.cmdclass]
+editable_wheel = "build_hooks.EditableWheelWithBootstrap"
+install = "build_hooks.InstallWithBootstrap"
 
 [tool.setuptools.packages.find]
 where = ["src"]

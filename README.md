@@ -60,14 +60,17 @@ pip3 install -e ".[train,infer]"
 
 ### 流水线 CLI
 
-流水线 CLI 随项目安装：
+推荐在项目虚拟环境中安装（editable 可正常工作）：
 
 ```bash
-pip3 install -e ".[dev]"
+source .venv-infer/bin/activate   # 或先创建：python3 -m venv .venv-infer
+pip install -e ".[dev]"
 flash-echo-pipeline list
 ```
 
-如果暂时不安装 editable package，也可以用：
+若使用 Homebrew 全局 `pip3 install -e`，macOS 上可能出现 editable `.pth` 未被解释器加载的情况；本项目 CLI 入口已内置路径修复，重装后可直接运行 `flash-echo-pipeline list`。仍建议日常开发使用上面的 venv。
+
+不安装 package 时的兜底：
 
 ```bash
 PYTHONPATH=src python -m flash_echo_pipeline.cli list
