@@ -13,10 +13,10 @@ configs/runtimes/        local / Docker CPU / Docker CUDA 等执行环境定义
 data/                    原始语料与 SFT 数据集
 docker/                  训练、导出、推理镜像的 Dockerfile
 docs/                    产品需求、训练、推理与流水线文档
-models/deploy/           ONNX 部署包（推理服务唯一消费的模型制品）
+models/deploy/           ONNX / ORT GenAI 部署包（推理服务唯一消费的模型制品）
 src/flash_echo_pipeline/ 模型数据、训练、导出、推理流水线 CLI
 src/flash_echo/          推理服务运行时
-tools/training/          MiniMind 数据生成、下载、SFT/LoRA 训练 CLI
+tools/training/          数据生成、预训练下载、SFT/LoRA 训练 CLI
 tools/export/            checkpoint -> ONNX deploy bundle 导出 CLI
 tools/inference/         本地推理调试与 OpenAI 兼容服务 CLI
 tests/                   单元测试与 API 测试
@@ -108,6 +108,16 @@ flash-echo-pipeline list
 - `minimind3`
 - `qwen3_5_0_8b`
 
+### 推荐执行顺序
+
+一条完整的模型产出链路按下面顺序执行：
+
+```text
+data -> download -> train -> upload_checkpoint -> export -> upload_deploy -> infer
+```
+
+也可以使用 `full` 一次串起数据、训练、导出、镜像构建和推理服务启动。日常更推荐拆开执行，便于复用已有数据、checkpoint 或 deploy bundle。
+
 ### Dry Run
 
 建议先用 dry run 查看即将执行的命令，不会实际下载模型、构建镜像或启动训练：
@@ -125,121 +135,14 @@ flash-echo-pipeline run qwen3_5_0_8b.export \
   --dry-run
 ```
 
-### 构建与推送 Docker 镜像
-
-项目镜像统一使用腾讯云 CCR 单仓库多 tag：
-
-```text
-ccr.ccs.tencentyun.com/huyyxy/flash-echo:<tag>
-```
-
-登录仓库：
-
-```bash
-export TENCENT_CCR_PASSWORD='your-password'
-printf '%s\n' "$TENCENT_CCR_PASSWORD" | docker login ccr.ccs.tencentyun.com --username=100011783411 --password-stdin
-```
-
-一键构建全部 x86_64 镜像：
-
-```bash
-flash-echo-pipeline image build-all
-```
-
-一键拉取全部镜像：
-
-```bash
-flash-echo-pipeline image pull-all
-```
-
-一键推送全部镜像：
-
-```bash
-flash-echo-pipeline image push-all
-```
-
-也可以只操作单个镜像：
-
-```bash
-flash-echo-pipeline image build docker.cpu
-flash-echo-pipeline image build docker.base-cuda
-flash-echo-pipeline image build minimind3.train
-flash-echo-pipeline image build minimind3.export
-flash-echo-pipeline image build minimind3.infer
-flash-echo-pipeline image build qwen3_5_0_8b.train
-flash-echo-pipeline image build qwen3_5_0_8b.export
-flash-echo-pipeline image build qwen3_5_0_8b.infer
-
-flash-echo-pipeline image pull qwen3_5_0_8b.infer
-flash-echo-pipeline image push qwen3_5_0_8b.infer
-```
-
-### 模型产物 COS 同步
-
-微调 checkpoint 和 ONNX deploy bundle 可以同步到腾讯云 COS：
-
-```text
-https://weights-1305049745.cos.ap-shanghai.myqcloud.com
-```
-
-在项目根目录 `.env` 中配置 COS 密钥：
-
-```bash
-QCLOUD_SECRET_ID='your-secret-id'
-QCLOUD_SECRET_KEY='your-secret-key'
-```
-
-COS 远端路径按基础模型、微调版本和 persona 组织：
-
-```text
-flash-echo/<base_model>/<version>/<persona>/checkpoint/best/
-flash-echo/<base_model>/<version>/<persona>/deploy/
-```
-
-示例路径：
-
-```text
-flash-echo/minimind3/v1.0.0/male_white_collar/checkpoint/best/
-flash-echo/qwen3_5_0_8b/v1.0.0/male_white_collar/deploy/
-```
-
-训练后上传 checkpoint：
-
-```bash
-flash-echo-pipeline run minimind3.upload_checkpoint \
-  --persona male_white_collar
-
-flash-echo-pipeline run qwen3_5_0_8b.upload_checkpoint \
-  --persona male_white_collar
-```
-
-导出后上传 deploy bundle：
-
-```bash
-flash-echo-pipeline run minimind3.upload_deploy \
-  --persona male_white_collar
-
-flash-echo-pipeline run qwen3_5_0_8b.upload_deploy \
-  --persona male_white_collar
-```
-
-`upload_model` 是 `upload_deploy` 的别名，表示上传推理服务实际消费的模型包。
-
-在新机器上恢复产物：
-
-```bash
-flash-echo-pipeline run minimind3.download_checkpoint \
-  --persona male_white_collar \
-  --resume
-
-flash-echo-pipeline run qwen3_5_0_8b.download_deploy \
-  --persona male_white_collar \
-  --resume
-```
-
-`download_model` 是 `download_deploy` 的别名，适合直接恢复推理所需模型包。
-
 ### MiniMind3 流程
+
+MiniMind3 使用 `data/filler_prefix/<persona>/` 下的 `train.jsonl`、`valid.jsonl`、`test.jsonl` 进行 SFT 微调。默认产物：
+
+```text
+models/checkpoints/minimind3-filler-<persona>-v1.0.0/best
+models/deploy/minimind3-filler-<persona-dash>-v1.0.0/
+```
 
 数据准备：
 
@@ -247,6 +150,14 @@ flash-echo-pipeline run qwen3_5_0_8b.download_deploy \
 flash-echo-pipeline run minimind3.data \
   --persona male_white_collar \
   --runtime docker.cpu
+```
+
+下载预训练模型：
+
+```bash
+flash-echo-pipeline run minimind3.download \
+  --runtime docker.cpu \
+  --resume
 ```
 
 训练：
@@ -259,7 +170,22 @@ flash-echo-pipeline run minimind3.train \
 
 `minimind3.train` 只执行预训练模型下载和微调。训练镜像需要提前用
 `flash-echo-pipeline image build minimind3.train` 构建，或者通过 `full` pipeline
-中的 `build_train_image` step 构建。
+中的 `build_train_image` step 构建。如果预训练模型已经准备好，只想继续训练 step，
+可以从 `finetune` 开始：
+
+```bash
+flash-echo-pipeline run minimind3.train \
+  --persona male_white_collar \
+  --from finetune \
+  --resume
+```
+
+训练后上传 checkpoint：
+
+```bash
+flash-echo-pipeline run minimind3.upload_checkpoint \
+  --persona male_white_collar
+```
 
 导出 ONNX deploy bundle：
 
@@ -272,6 +198,25 @@ flash-echo-pipeline run minimind3.export \
 `minimind3.export` 只执行 ONNX 导出。导出镜像需要提前用
 `flash-echo-pipeline image build minimind3.export` 构建，或者通过 `full` pipeline
 中的 `build_export_image` step 构建。
+
+导出后上传 deploy bundle：
+
+```bash
+flash-echo-pipeline run minimind3.upload_deploy \
+  --persona male_white_collar
+```
+
+启动推理服务：
+
+```bash
+flash-echo-pipeline run minimind3.infer \
+  --persona male_white_collar \
+  --runtime docker.minimind3-infer
+```
+
+`minimind3.infer` 只启动推理服务。推理镜像需要提前用
+`flash-echo-pipeline image build minimind3.infer` 构建，或者通过 `full` pipeline
+中的 `build_infer_image` step 构建。
 
 完整流程：
 
@@ -287,9 +232,10 @@ Qwen3.5-0.8B 也支持使用 `data/filler_prefix/<persona>/` 下的 `train.jsonl
 
 ```text
 models/checkpoints/qwen3_5_0_8b-filler-<persona>-v1.0.0/best
+models/deploy/qwen3_5_0_8b-filler-<persona-dash>-v1.0.0-onnx/
 ```
 
-导出阶段默认读取该 best checkpoint，并输出 persona 专属 ONNX / ORT GenAI deploy bundle。
+导出阶段默认读取 best checkpoint，并输出 persona 专属 ONNX / ORT GenAI deploy bundle。
 
 数据准备：
 
@@ -327,6 +273,13 @@ flash-echo-pipeline run qwen3_5_0_8b.train \
   --resume
 ```
 
+训练后上传 checkpoint：
+
+```bash
+flash-echo-pipeline run qwen3_5_0_8b.upload_checkpoint \
+  --persona male_white_collar
+```
+
 导出：
 
 ```bash
@@ -339,16 +292,126 @@ flash-echo-pipeline run qwen3_5_0_8b.export \
 `flash-echo-pipeline image build qwen3_5_0_8b.export` 构建，或者通过 `full` pipeline
 中的 `build_export_image` step 构建。
 
+导出后上传 deploy bundle：
+
+```bash
+flash-echo-pipeline run qwen3_5_0_8b.upload_deploy \
+  --persona male_white_collar
+```
+
 启动推理服务：
 
 ```bash
 flash-echo-pipeline run qwen3_5_0_8b.infer \
+  --persona male_white_collar \
   --runtime docker.qwen-infer
 ```
 
 `qwen3_5_0_8b.infer` 只启动推理服务。推理镜像需要提前用
 `flash-echo-pipeline image build qwen3_5_0_8b.infer` 构建，或者通过 `full` pipeline
 中的 `build_infer_image` step 构建。
+
+完整流程：
+
+```bash
+flash-echo-pipeline run qwen3_5_0_8b.full \
+  --persona male_white_collar \
+  --resume
+```
+
+### COS 产物同步
+
+微调 checkpoint 和 deploy bundle 可以同步到腾讯云 COS：
+
+```text
+https://weights-1305049745.cos.ap-shanghai.myqcloud.com
+```
+
+在项目根目录 `.env` 中配置 COS 密钥：
+
+```bash
+QCLOUD_SECRET_ID='your-secret-id'
+QCLOUD_SECRET_KEY='your-secret-key'
+```
+
+COS 远端路径按基础模型、微调版本和 persona 组织：
+
+```text
+flash-echo/<base_model>/<version>/<persona>/checkpoint/best/
+flash-echo/<base_model>/<version>/<persona>/deploy/
+```
+
+示例路径：
+
+```text
+flash-echo/minimind3/v1.0.0/male_white_collar/checkpoint/best/
+flash-echo/qwen3_5_0_8b/v1.0.0/male_white_collar/deploy/
+```
+
+在新机器上恢复 checkpoint：
+
+```bash
+flash-echo-pipeline run minimind3.download_checkpoint \
+  --persona male_white_collar \
+  --resume
+
+flash-echo-pipeline run qwen3_5_0_8b.download_checkpoint \
+  --persona male_white_collar \
+  --resume
+```
+
+在新机器上恢复 deploy bundle：
+
+```bash
+flash-echo-pipeline run minimind3.download_deploy \
+  --persona male_white_collar \
+  --resume
+
+flash-echo-pipeline run qwen3_5_0_8b.download_deploy \
+  --persona male_white_collar \
+  --resume
+```
+
+`upload_model` 是 `upload_deploy` 的别名，表示上传推理服务实际消费的模型包。`download_model` 是 `download_deploy` 的别名，适合直接恢复推理所需模型包。
+
+### 构建与推送 Docker 镜像
+
+项目镜像统一使用腾讯云 CCR 单仓库多 tag：
+
+```text
+ccr.ccs.tencentyun.com/huyyxy/flash-echo:<tag>
+```
+
+登录仓库：
+
+```bash
+export TENCENT_CCR_PASSWORD='your-password'
+printf '%s\n' "$TENCENT_CCR_PASSWORD" | docker login ccr.ccs.tencentyun.com --username=100011783411 --password-stdin
+```
+
+一键构建、拉取或推送全部 x86_64 镜像：
+
+```bash
+flash-echo-pipeline image build-all
+flash-echo-pipeline image pull-all
+flash-echo-pipeline image push-all
+```
+
+也可以只操作单个镜像：
+
+```bash
+flash-echo-pipeline image build docker.cpu
+flash-echo-pipeline image build docker.base-cuda
+flash-echo-pipeline image build minimind3.train
+flash-echo-pipeline image build minimind3.export
+flash-echo-pipeline image build minimind3.infer
+flash-echo-pipeline image build qwen3_5_0_8b.train
+flash-echo-pipeline image build qwen3_5_0_8b.export
+flash-echo-pipeline image build qwen3_5_0_8b.infer
+
+flash-echo-pipeline image pull qwen3_5_0_8b.infer
+flash-echo-pipeline image push qwen3_5_0_8b.infer
+```
 
 ### 单步执行
 
@@ -403,6 +466,7 @@ flash-echo-pipeline run minimind3.full \
 | `docker.cpu` | 数据清洗、审计、CPU 推理或导出 |
 | `docker.cuda` | Ubuntu + NVIDIA GPU 训练 |
 | `docker.minimind3-export` | MiniMind3 ONNX 导出 |
+| `docker.minimind3-infer` | MiniMind3 推理服务 |
 | `docker.qwen-train` | Qwen3.5-0.8B SFT 训练 |
 | `docker.qwen-export` | Qwen3.5-0.8B ONNX / ORT GenAI 导出 |
 | `docker.qwen-infer` | Qwen3.5-0.8B 推理服务 |
