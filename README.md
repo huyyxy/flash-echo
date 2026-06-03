@@ -56,7 +56,7 @@ pip3 install -e ".[train]"
 pip3 install -e ".[train,infer]"
 ```
 
-兼容旧命令：`pip install -e ".[ml]"` 等价于安装训练 + 推理全部 ML 依赖。
+兼容旧命令：`pip3 install -e ".[ml]"` 等价于安装训练 + 推理全部 ML 依赖。
 
 ### 流水线 CLI
 
@@ -64,7 +64,7 @@ pip3 install -e ".[train,infer]"
 
 ```bash
 source .venv-infer/bin/activate   # 或先创建：python3 -m venv .venv-infer
-pip install -e ".[dev]"
+pip3 install -e ".[dev]"
 flash-echo-pipeline list
 ```
 
@@ -73,7 +73,7 @@ flash-echo-pipeline list
 不安装 package 时的兜底：
 
 ```bash
-PYTHONPATH=src python -m flash_echo_pipeline.cli list
+PYTHONPATH=src python3 -m flash_echo_pipeline.cli list
 ```
 
 ## 快速开始（推理服务）
