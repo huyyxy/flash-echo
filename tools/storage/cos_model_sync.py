@@ -13,7 +13,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import http.client
 import os
+import socket
 import sys
 import time
 import urllib.parse
@@ -49,6 +51,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--bucket-url", default=DEFAULT_BUCKET_URL)
     parser.add_argument("--dotenv", type=Path, default=PROJECT_ROOT / ".env")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--retries", type=int, default=5)
+    parser.add_argument("--retry-wait", type=float, default=2.0)
+    parser.add_argument("--timeout", type=float, default=120.0)
     return parser.parse_args()
 
 
@@ -124,25 +129,36 @@ def quote_query(value: str) -> str:
 
 
 class CosClient:
-    def __init__(self, *, bucket_url: str, credentials: Credentials) -> None:
+    def __init__(
+        self,
+        *,
+        bucket_url: str,
+        credentials: Credentials,
+        retries: int,
+        retry_wait: float,
+        timeout: float,
+    ) -> None:
         parsed = urllib.parse.urlparse(bucket_url.rstrip("/"))
         if parsed.scheme not in {"http", "https"} or not parsed.netloc:
             raise ValueError(f"invalid bucket-url: {bucket_url}")
         self.bucket_url = bucket_url.rstrip("/")
         self.host = parsed.netloc
         self.credentials = credentials
+        self.retries = retries
+        self.retry_wait = retry_wait
+        self.timeout = timeout
 
     def upload_file(self, *, local_path: Path, key: str) -> None:
         data = local_path.read_bytes()
         request = self._request("PUT", key=key, data=data)
         request.add_header("Content-Length", str(len(data)))
-        with urllib.request.urlopen(request) as response:
+        with self._urlopen(request, description=f"upload {key}") as response:
             if response.status not in {200, 201}:
                 raise RuntimeError(f"unexpected COS upload status {response.status}: {key}")
 
     def download_file(self, *, key: str, local_path: Path) -> None:
         request = self._request("GET", key=key)
-        with urllib.request.urlopen(request) as response:
+        with self._urlopen(request, description=f"download {key}") as response:
             if response.status != 200:
                 raise RuntimeError(f"unexpected COS download status {response.status}: {key}")
             local_path.parent.mkdir(parents=True, exist_ok=True)
@@ -179,10 +195,34 @@ class CosClient:
 
     def _request_text(self, method: str, *, key: str, params: dict[str, str]) -> str:
         request = self._request(method, key=key, params=params)
-        with urllib.request.urlopen(request) as response:
+        with self._urlopen(request, description=f"{method} {key or '/'}") as response:
             if response.status != 200:
                 raise RuntimeError(f"unexpected COS list status {response.status}")
             return response.read().decode("utf-8")
+
+    def _urlopen(self, request: urllib.request.Request, *, description: str):
+        attempts = self.retries + 1
+        for attempt in range(1, attempts + 1):
+            try:
+                return urllib.request.urlopen(request, timeout=self.timeout)
+            except urllib.error.HTTPError as error:
+                if error.code not in {429, 500, 502, 503, 504} or attempt == attempts:
+                    raise
+                error.close()
+                self._sleep_before_retry(description=description, attempt=attempt, attempts=attempts, error=error)
+            except (urllib.error.URLError, ConnectionResetError, TimeoutError, socket.timeout, http.client.HTTPException) as error:
+                if attempt == attempts:
+                    raise
+                self._sleep_before_retry(description=description, attempt=attempt, attempts=attempts, error=error)
+
+        raise RuntimeError(f"unreachable retry state for COS request: {description}")
+
+    def _sleep_before_retry(self, *, description: str, attempt: int, attempts: int, error: BaseException) -> None:
+        print(
+            f"retry COS {description} after transient error on attempt {attempt}/{attempts}: {error}",
+            file=sys.stderr,
+        )
+        time.sleep(self.retry_wait)
 
     def _request(
         self,
@@ -300,6 +340,12 @@ def download_directory(client: CosClient, *, local_dir: Path, remote_prefix: str
 
 def main() -> int:
     args = parse_args()
+    if args.retries < 0:
+        raise ValueError("retries must be non-negative")
+    if args.retry_wait < 0:
+        raise ValueError("retry-wait must be non-negative")
+    if args.timeout <= 0:
+        raise ValueError("timeout must be greater than 0")
     remote_prefix = normalize_prefix(args.remote_prefix)
     if args.dry_run and args.action == "download":
         print(f"download cos://{remote_prefix}/... -> {args.local_dir}")
@@ -313,7 +359,13 @@ def main() -> int:
             print(f"upload {args.local_dir}/... -> cos://{remote_prefix}/...")
         return 0
     credentials = resolve_credentials(args.dotenv)
-    client = CosClient(bucket_url=args.bucket_url, credentials=credentials)
+    client = CosClient(
+        bucket_url=args.bucket_url,
+        credentials=credentials,
+        retries=args.retries,
+        retry_wait=args.retry_wait,
+        timeout=args.timeout,
+    )
     if args.action == "upload":
         upload_directory(client, local_dir=args.local_dir, remote_prefix=remote_prefix, dry_run=args.dry_run)
     else:
