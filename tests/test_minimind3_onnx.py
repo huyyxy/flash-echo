@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-from filler_words.inference.minimind3_onnx import MiniMind3OnnxGenerator
+from flash_echo.inference import minimind3_onnx
+from flash_echo.inference.minimind3_onnx import MiniMind3ModelPool, MiniMind3OnnxGenerator
 
 
 class FakeTensor:
@@ -53,10 +56,26 @@ class FakeModel:
         return [FakeTensor(5)]
 
 
-def test_generate_drops_token_type_ids_from_model_inputs(tmp_path: Path) -> None:
-    (tmp_path / "inference_config.json").write_text(
+class SlowGenerator(MiniMind3OnnxGenerator):
+    def _generate_sync(self, query: str):
+        time.sleep(0.05)
+        return super()._generate_sync(query)
+
+
+class CountedGenerator:
+    created = 0
+
+    def __init__(self, bundle_dir: Path) -> None:
+        time.sleep(0.01)
+        type(self).created += 1
+        self.bundle_dir = bundle_dir
+
+
+def _write_inference_config(path: Path, *, timeout_ms: int = 500) -> None:
+    (path / "inference_config.json").write_text(
         json.dumps(
             {
+                "timeout_ms": timeout_ms,
                 "prompt_template": {
                     "user_prefix": "",
                     "user_prompt_suffix": "",
@@ -72,6 +91,10 @@ def test_generate_drops_token_type_ids_from_model_inputs(tmp_path: Path) -> None
         ),
         encoding="utf-8",
     )
+
+
+def test_generate_drops_token_type_ids_from_model_inputs(tmp_path: Path) -> None:
+    _write_inference_config(tmp_path)
     fake_model = FakeModel()
     generator = MiniMind3OnnxGenerator(tmp_path)
     generator._model = fake_model
@@ -84,3 +107,28 @@ def test_generate_drops_token_type_ids_from_model_inputs(tmp_path: Path) -> None
     assert "input_ids" in fake_model.generate_kwargs
     assert "attention_mask" in fake_model.generate_kwargs
     assert "token_type_ids" not in fake_model.generate_kwargs
+
+
+def test_timeout_replaces_executor(tmp_path: Path) -> None:
+    _write_inference_config(tmp_path, timeout_ms=1)
+    generator = SlowGenerator(tmp_path)
+    generator._model = FakeModel()
+    generator._tokenizer = FakeTokenizer()
+    old_executor = generator._executor
+
+    result = generator.generate("您好呀！")
+
+    assert result.timed_out is True
+    assert generator._executor is not old_executor
+
+
+def test_model_pool_only_creates_one_session_under_concurrency(tmp_path: Path, monkeypatch) -> None:
+    CountedGenerator.created = 0
+    monkeypatch.setattr(minimind3_onnx, "MiniMind3OnnxGenerator", CountedGenerator)
+    pool = MiniMind3ModelPool()
+
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        sessions = list(executor.map(lambda _: pool.get(tmp_path), range(8)))
+
+    assert CountedGenerator.created == 1
+    assert len({id(session) for session in sessions}) == 1

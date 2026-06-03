@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from filler_words.core.enums import FallbackReason
+from flash_echo.core.enums import FallbackReason
 
 
 @dataclass(frozen=True)

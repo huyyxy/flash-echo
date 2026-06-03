@@ -7,13 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from filler_words.core.enums import StaticRuleMatchType
-from filler_words.core.normalization import normalize_query
+from flash_echo.core.enums import StaticRuleMatchType
+from flash_echo.core.normalization import normalize_query
 
-_LEGACY_MATCH_TYPES: dict[str, StaticRuleMatchType] = {
-    "alias": StaticRuleMatchType.EXACT,
-    "exact_or_alias": StaticRuleMatchType.EXACT,
-}
 _TRAILING_NON_QUESTION_PUNCT_RE = re.compile(r"[。！!，,、；;：:~～…]+$")
 
 
@@ -38,8 +34,6 @@ class StaticRule:
 def parse_match_type(raw: str | None) -> StaticRuleMatchType | None:
     if not raw:
         return StaticRuleMatchType.EXACT
-    if raw in _LEGACY_MATCH_TYPES:
-        return _LEGACY_MATCH_TYPES[raw]
     try:
         return StaticRuleMatchType(raw)
     except ValueError:

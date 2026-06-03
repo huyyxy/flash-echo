@@ -28,7 +28,7 @@ train = [
 ]
 
 [project.scripts]
-flash-echo = "flash_echo_bootstrap:launch_filler_app"
+flash-echo = "flash_echo_bootstrap:launch_app"
 flash-echo-pipeline = "flash_echo_bootstrap:launch_pipeline_cli"
 
 [build-system]

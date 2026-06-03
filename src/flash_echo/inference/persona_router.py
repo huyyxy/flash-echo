@@ -53,6 +53,8 @@ class PersonaModelRouter:
             return None
         if not (route.bundle_dir / "model.onnx").exists():
             return None
+        if not (route.bundle_dir / "inference_config.json").exists():
+            return None
         return route
 
     def list_personas(self) -> list[str]:

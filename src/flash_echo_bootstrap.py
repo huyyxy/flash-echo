@@ -49,7 +49,7 @@ def _editable_project_src() -> Optional[Path]:
 
 def ensure_src_packages() -> None:
     """Expose ``src/`` packages when editable ``.pth`` hooks were not applied."""
-    if importlib.util.find_spec("filler_words") and importlib.util.find_spec(
+    if importlib.util.find_spec("flash_echo") and importlib.util.find_spec(
         "flash_echo_pipeline"
     ):
         return
@@ -63,9 +63,9 @@ def ensure_src_packages() -> None:
         sys.path.insert(0, src_str)
 
 
-def launch_filler_app() -> None:
+def launch_app() -> None:
     ensure_src_packages()
-    from filler_words.app import main
+    from flash_echo.app import main
 
     main()
 

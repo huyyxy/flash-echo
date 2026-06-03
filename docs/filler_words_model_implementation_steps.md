@@ -198,7 +198,7 @@ Static Reply Gate 只覆盖高置信、高频、低歧义、无需 Qwen-Plus 续
    - `exact_with_trailing_punctuation`：在 `exact` 基础上，允许 Query 句尾带非问号类语气/停顿标点（如 `。`、`！`、`，`、`~`），但不去除 `？` 或 `?`。
    - `prefix`：归一化后以 `patterns` 中某一项为前缀。
    - `regex`：归一化后全文匹配 `patterns` 中的正则（`fullmatch`）；仅用于少量保守规则。
-   - 历史值 `alias`、`exact_or_alias` 仍兼容，等价于 `exact`。
+   - 不再支持历史值 `alias`、`exact_or_alias`；需要使用 `exact`。
 3. `negative_examples` 必须覆盖容易误拦截的真实问题。
 4. `replies` 按 Persona 配置候选完整短回复，并提供 `default` 兜底。
 5. 每条规则至少配置 3 到 10 条候选短回复，候选不足时可先固定返回，但需要在验收中标记。

@@ -6,15 +6,15 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from filler_words.api.schemas import ChatCompletionRequest, RequestMetadata
-from filler_words.app import build_service, create_app
-from filler_words.core.cache import LruTtlCache
-from filler_words.core.enums import FallbackReason, ReplyKind, Route
-from filler_words.fallback.registry import FallbackPrefixRegistry
-from filler_words.inference.minimind3_onnx import GenerationResult
-from filler_words.inference.persona_router import PersonaModelRouter, PersonaRoute
-from filler_words.service.filler_service import FillerReplyService, ServiceSettings
-from filler_words.static_rules.gate import DEFAULT_STATIC_RULES, StaticReplyGate
+from flash_echo.api.schemas import ChatCompletionRequest, RequestMetadata
+from flash_echo.app import build_service, create_app
+from flash_echo.core.cache import LruTtlCache
+from flash_echo.core.enums import FallbackReason, ReplyKind, Route
+from flash_echo.fallback.registry import FallbackPrefixRegistry
+from flash_echo.inference.minimind3_onnx import GenerationResult
+from flash_echo.inference.persona_router import PersonaModelRouter, PersonaRoute
+from flash_echo.service.filler_service import FillerReplyService, ServiceSettings
+from flash_echo.static_rules.gate import DEFAULT_STATIC_RULES, StaticReplyGate
 
 
 @dataclass
@@ -36,7 +36,7 @@ class FakeGenerator:
 
     @property
     def validator(self):
-        from filler_words.inference.validator import OutputValidator, ValidationConfig
+        from flash_echo.inference.validator import OutputValidator, ValidationConfig
 
         return OutputValidator(
             ValidationConfig(
@@ -56,6 +56,16 @@ class FakeModelPool:
         return self.generator
 
 
+class FailingModelPool:
+    def get(self, bundle_dir: Path) -> FakeGenerator:
+        raise RuntimeError("model bundle is not loadable")
+
+
+class FailingGenerator(FakeGenerator):
+    def generate(self, query: str) -> GenerationResult:
+        raise RuntimeError("generation failed")
+
+
 def _build_test_service(
     *,
     generator: FakeGenerator | None = None,
@@ -66,6 +76,7 @@ def _build_test_service(
     bundle_dir = deploy_root / "minimind3-filler-male-white-collar-v1.0.0"
     bundle_dir.mkdir(parents=True, exist_ok=True)
     (bundle_dir / "model.onnx").touch()
+    (bundle_dir / "inference_config.json").touch()
     router = PersonaModelRouter(
         {
             persona_tag: PersonaRoute(
@@ -151,6 +162,78 @@ def test_unknown_persona_uses_fallback() -> None:
             model="filler-reply-minimind3",
             messages=[{"role": "user", "content": "帮我写一封请假邮件"}],
             metadata=RequestMetadata(persona_tag="unknown_persona", request_id="req-3"),
+        )
+    )
+
+    assert response.filler_reply.route is Route.FALLBACK_FILLER
+    assert response.filler_reply.fallback_reason is FallbackReason.MODEL_UNAVAILABLE
+
+
+def test_missing_inference_config_uses_fallback(tmp_path: Path) -> None:
+    bundle_dir = tmp_path / "minimind3-filler-male-white-collar-v1.0.0"
+    bundle_dir.mkdir(parents=True)
+    (bundle_dir / "model.onnx").touch()
+    router = PersonaModelRouter(
+        {
+            "male_white_collar": PersonaRoute(
+                persona_tag="male_white_collar",
+                model_version="minimind3-filler-male-white-collar-v1.0.0",
+                bundle_dir=bundle_dir,
+                enabled=True,
+            )
+        },
+        version="model-router-test",
+    )
+    service = FillerReplyService(
+        static_gate=StaticReplyGate.from_config(DEFAULT_STATIC_RULES),
+        persona_router=router,
+        fallback_registry=FallbackPrefixRegistry.from_config(
+            {
+                "version": "fallback-prefix-v1",
+                "zh-CN": {"male_white_collar": ["我想一下，"], "default": ["我想一下，"]},
+            }
+        ),
+        model_pool=FakeModelPool(FakeGenerator("这个问题可以这样看，")),
+        cache=LruTtlCache(max_entries=100, ttl_seconds=60),
+        settings=ServiceSettings(),
+    )
+
+    response = service.create_completion(
+        ChatCompletionRequest(
+            model="filler-reply-minimind3",
+            messages=[{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
+            metadata=RequestMetadata(persona_tag="male_white_collar"),
+        )
+    )
+
+    assert response.filler_reply.route is Route.FALLBACK_FILLER
+    assert response.filler_reply.fallback_reason is FallbackReason.MODEL_UNAVAILABLE
+
+
+def test_model_pool_error_uses_fallback() -> None:
+    service = _build_test_service()
+    service.model_pool = FailingModelPool()
+
+    response = service.create_completion(
+        ChatCompletionRequest(
+            model="filler-reply-minimind3",
+            messages=[{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
+            metadata=RequestMetadata(persona_tag="male_white_collar"),
+        )
+    )
+
+    assert response.filler_reply.route is Route.FALLBACK_FILLER
+    assert response.filler_reply.fallback_reason is FallbackReason.MODEL_UNAVAILABLE
+
+
+def test_generation_error_uses_fallback() -> None:
+    service = _build_test_service(generator=FailingGenerator("不会返回"))
+
+    response = service.create_completion(
+        ChatCompletionRequest(
+            model="filler-reply-minimind3",
+            messages=[{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
+            metadata=RequestMetadata(persona_tag="male_white_collar"),
         )
     )
 

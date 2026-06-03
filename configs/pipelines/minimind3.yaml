@@ -267,10 +267,11 @@ steps:
     resume: false
 
   serve:
-    runtime: docker.cpu
+    runtime: docker.minimind3-infer
     command:
       - flash-echo
     inputs:
       - "{paths.deploy_dir}/model.onnx"
+      - "{paths.deploy_dir}/inference_config.json"
     outputs: []
     resume: false

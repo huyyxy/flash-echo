@@ -1,0 +1,17 @@
+name: docker.minimind3-infer
+type: docker
+image: ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-infer
+dockerfile: docker/minimind3/Dockerfile.infer
+platform: linux/amd64
+gpu: none
+workdir: /workspace
+ports:
+  - host: 8000
+    container: 8000
+mounts:
+  - source: .
+    target: /workspace
+env:
+  PYTHONPATH: /workspace/src
+  HF_HOME: /workspace/models/.cache/huggingface
+  TRANSFORMERS_CACHE: /workspace/models/.cache/huggingface

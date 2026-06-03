@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from filler_words.core.enums import FallbackReason, ReplyKind, Route
+from flash_echo.core.enums import FallbackReason, ReplyKind, Route
 
 DEFAULT_SERVICE_MODEL = "filler-reply-minimind3"
 DEFAULT_PERSONA_TAG = "male_white_collar"

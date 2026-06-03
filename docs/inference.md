@@ -86,14 +86,14 @@ models/deploy/<model_version>/
 ```bash
 export FILLER_CONFIG_DIR=configs
 export FILLER_DEPLOY_ROOT=models/deploy
-uvicorn filler_words.app:create_app --factory --reload
+uvicorn flash_echo.app:create_app --factory --reload
 ```
 
 ## 启动推理服务
 
 ```bash
 source .venv-infer/bin/activate
-uvicorn filler_words.app:create_app --factory --host 0.0.0.0 --port 8000
+uvicorn flash_echo.app:create_app --factory --host 0.0.0.0 --port 8000
 ```
 
 或使用 CLI 入口：

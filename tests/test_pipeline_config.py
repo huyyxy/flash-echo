@@ -79,6 +79,25 @@ def test_runner_can_build_runtime_image_command() -> None:
     ]
 
 
+def test_minimind3_infer_uses_infer_runtime_with_port_mapping() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    result = runner.run_step(
+        model="minimind3",
+        step_name="serve",
+        persona="male_white_collar",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert result.runtime == "docker.minimind3-infer"
+    assert "ccr.ccs.tencentyun.com/huyyxy/flash-echo:minimind3-infer" in result.command
+    assert "-p" in result.command
+    assert "8000:8000" in result.command
+
+
 def test_runner_can_push_runtime_image_command() -> None:
     runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
 

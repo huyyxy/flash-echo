@@ -126,14 +126,16 @@ src/
 现有目录保留：
 
 ```text
-src/filler_words/      线上推理服务
-tools/training/        训练与数据脚本
-tools/export/          模型导出脚本
-tools/inference/       推理调试和服务脚本
+src/flash_echo/          线上推理服务
+tools/training/          训练与数据脚本 CLI
+tools/export/            模型导出脚本 CLI
+tools/inference/         推理调试和服务脚本 CLI
 configs/               服务运行时配置
 data/                  数据集
 models/                预训练、checkpoint、deploy bundle
 ```
+
+后续共享的流水线 step 逻辑沉到 `src/flash_echo_pipeline/steps/`，`tools/` 保留为兼容命令入口。
 
 ## 5. 流水线配置
 

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import threading
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from filler_words.inference.validator import OutputValidator, load_inference_config
+from flash_echo.inference.validator import OutputValidator, load_inference_config
 
 
 @dataclass(frozen=True)
@@ -27,7 +28,13 @@ class MiniMind3OnnxGenerator:
         self.model_version = self._load_model_version(bundle_dir)
         self._model: Any | None = None
         self._tokenizer: Any | None = None
-        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="minimind3-onnx")
+        self._load_lock = threading.Lock()
+        self._executor_lock = threading.Lock()
+        self._executor = self._create_executor()
+
+    @staticmethod
+    def _create_executor() -> ThreadPoolExecutor:
+        return ThreadPoolExecutor(max_workers=1, thread_name_prefix="minimind3-onnx")
 
     @staticmethod
     def _load_model_version(bundle_dir: Path) -> str:
@@ -42,25 +49,29 @@ class MiniMind3OnnxGenerator:
         if self._model is not None and self._tokenizer is not None:
             return
 
-        try:
-            from optimum.onnxruntime import ORTModelForCausalLM
-            from transformers import AutoTokenizer
-        except ImportError as exc:
-            raise ImportError(
-                "MiniMind3 ONNX inference requires optimum and transformers. "
-                'Install with: pip install -e ".[infer]"'
-            ) from exc
+        with self._load_lock:
+            if self._model is not None and self._tokenizer is not None:
+                return
 
-        self._model = ORTModelForCausalLM.from_pretrained(
-            str(self.bundle_dir),
-            provider="CPUExecutionProvider",
-        )
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            str(self.bundle_dir),
-            trust_remote_code=True,
-        )
-        if self._tokenizer.pad_token_id is None:
-            self._tokenizer.pad_token = self._tokenizer.eos_token
+            try:
+                from optimum.onnxruntime import ORTModelForCausalLM
+                from transformers import AutoTokenizer
+            except ImportError as exc:
+                raise ImportError(
+                    "MiniMind3 ONNX inference requires optimum and transformers. "
+                    'Install with: pip install -e ".[infer]"'
+                ) from exc
+
+            self._model = ORTModelForCausalLM.from_pretrained(
+                str(self.bundle_dir),
+                provider="CPUExecutionProvider",
+            )
+            self._tokenizer = AutoTokenizer.from_pretrained(
+                str(self.bundle_dir),
+                trust_remote_code=True,
+            )
+            if self._tokenizer.pad_token_id is None:
+                self._tokenizer.pad_token = self._tokenizer.eos_token
 
     def build_prompt(self, query: str) -> str:
         self._ensure_loaded()
@@ -80,12 +91,20 @@ class MiniMind3OnnxGenerator:
     def generate(self, query: str) -> GenerationResult:
         timeout_ms = int(self.inference_config.get("timeout_ms", 500))
         timeout_seconds = max(timeout_ms, 1) / 1000.0
-        future = self._executor.submit(self._generate_sync, query)
+        with self._executor_lock:
+            future = self._executor.submit(self._generate_sync, query)
         try:
             return future.result(timeout=timeout_seconds)
         except FuturesTimeoutError:
             future.cancel()
+            self._replace_executor()
             return GenerationResult(text="", prompt_tokens=0, completion_tokens=0, timed_out=True)
+
+    def _replace_executor(self) -> None:
+        with self._executor_lock:
+            old_executor = self._executor
+            self._executor = self._create_executor()
+        old_executor.shutdown(wait=False, cancel_futures=True)
 
     def _generate_sync(self, query: str) -> GenerationResult:
         self._ensure_loaded()
@@ -134,11 +153,13 @@ class MiniMind3ModelPool:
 
     def __init__(self) -> None:
         self._sessions: dict[str, MiniMind3OnnxGenerator] = {}
+        self._lock = threading.Lock()
 
     def get(self, bundle_dir: Path) -> MiniMind3OnnxGenerator:
         key = str(bundle_dir.resolve())
-        session = self._sessions.get(key)
-        if session is None:
-            session = MiniMind3OnnxGenerator(bundle_dir)
-            self._sessions[key] = session
-        return session
+        with self._lock:
+            session = self._sessions.get(key)
+            if session is None:
+                session = MiniMind3OnnxGenerator(bundle_dir)
+                self._sessions[key] = session
+            return session

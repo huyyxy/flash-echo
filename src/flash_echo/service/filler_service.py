@@ -4,7 +4,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from filler_words.api.schemas import (
+from flash_echo.api.schemas import (
     ChatCompletionChoice,
     ChatCompletionMessage,
     ChatCompletionRequest,
@@ -12,13 +12,13 @@ from filler_words.api.schemas import (
     FillerReplyMeta,
     UsageInfo,
 )
-from filler_words.core.cache import CachedFillerResult, LruTtlCache
-from filler_words.core.enums import FallbackReason, ReplyKind, Route
-from filler_words.core.normalization import NORMALIZER_VERSION, normalize_query
-from filler_words.fallback.registry import FallbackPrefixRegistry
-from filler_words.inference.minimind3_onnx import MiniMind3ModelPool
-from filler_words.inference.persona_router import PersonaModelRouter
-from filler_words.static_rules.gate import StaticReplyGate
+from flash_echo.core.cache import CachedFillerResult, LruTtlCache
+from flash_echo.core.enums import FallbackReason, ReplyKind, Route
+from flash_echo.core.normalization import NORMALIZER_VERSION, normalize_query
+from flash_echo.fallback.registry import FallbackPrefixRegistry
+from flash_echo.inference.minimind3_onnx import MiniMind3ModelPool
+from flash_echo.inference.persona_router import PersonaModelRouter
+from flash_echo.static_rules.gate import StaticReplyGate
 
 
 logger = logging.getLogger(__name__)
@@ -112,7 +112,24 @@ class FillerReplyService:
                 request_id=request_id,
             )
 
-        generator = self.model_pool.get(route.bundle_dir)
+        try:
+            generator = self.model_pool.get(route.bundle_dir)
+        except Exception:
+            logger.exception(
+                "MiniMind3 generator unavailable request_id=%s persona_tag=%s model_version=%s",
+                request_id,
+                metadata.persona_tag,
+                route.model_version,
+            )
+            return self._fallback_response(
+                request=request,
+                created=created,
+                persona_tag=metadata.persona_tag,
+                locale=metadata.locale,
+                fallback_reason=FallbackReason.MODEL_UNAVAILABLE,
+                request_id=request_id,
+            )
+
         logger.info(
             "MiniMind3 input request_id=%s persona_tag=%s model_version=%s input=%r",
             request_id,
@@ -120,7 +137,23 @@ class FillerReplyService:
             route.model_version,
             normalized_query,
         )
-        generation = generator.generate(normalized_query)
+        try:
+            generation = generator.generate(normalized_query)
+        except Exception:
+            logger.exception(
+                "MiniMind3 generation failed request_id=%s persona_tag=%s model_version=%s",
+                request_id,
+                metadata.persona_tag,
+                route.model_version,
+            )
+            return self._fallback_response(
+                request=request,
+                created=created,
+                persona_tag=metadata.persona_tag,
+                locale=metadata.locale,
+                fallback_reason=FallbackReason.MODEL_UNAVAILABLE,
+                request_id=request_id,
+            )
         logger.info(
             "MiniMind3 output request_id=%s persona_tag=%s model_version=%s output=%r "
             "timed_out=%s prompt_tokens=%s completion_tokens=%s",

@@ -15,14 +15,14 @@ docker/                  训练、导出、推理镜像的 Dockerfile
 docs/                    产品需求、训练、推理与流水线文档
 models/deploy/           ONNX 部署包（推理服务唯一消费的模型制品）
 src/flash_echo_pipeline/ 模型数据、训练、导出、推理流水线 CLI
-src/filler_words/        推理服务运行时
-tools/training/          MiniMind 数据生成、下载、SFT/LoRA 训练
-tools/export/            checkpoint -> ONNX deploy bundle 导出
-tools/inference/         本地推理调试与 OpenAI 兼容服务脚本
+src/flash_echo/          推理服务运行时
+tools/training/          MiniMind 数据生成、下载、SFT/LoRA 训练 CLI
+tools/export/            checkpoint -> ONNX deploy bundle 导出 CLI
+tools/inference/         本地推理调试与 OpenAI 兼容服务 CLI
 tests/                   单元测试与 API 测试
 ```
 
-训练、导出、推理可以使用不同依赖环境。推荐通过 `flash-echo-pipeline` 统一编排步骤，并按需要选择本地或 Docker runtime。
+训练、导出、推理可以使用不同依赖环境。推荐通过 `flash-echo-pipeline` 统一编排步骤，并按需要选择本地或 Docker runtime。`tools/` 下脚本作为稳定 CLI 入口保留，后续共享逻辑会逐步沉到 `src/flash_echo_pipeline/steps/`。
 
 ## 环境安装
 
@@ -78,7 +78,7 @@ PYTHONPATH=src python3 -m flash_echo_pipeline.cli list
 
 ```bash
 source .venv-infer/bin/activate
-uvicorn filler_words.app:create_app --factory --reload
+uvicorn flash_echo.app:create_app --factory --reload
 ```
 
 请求示例：

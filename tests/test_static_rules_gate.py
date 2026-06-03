@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from filler_words.core.enums import StaticRuleMatchType
-from filler_words.static_rules.gate import StaticReplyGate, parse_match_type
+from flash_echo.core.enums import StaticRuleMatchType
+from flash_echo.static_rules.gate import StaticReplyGate, parse_match_type
 
 
 def _gate_from_rules(rules: list[dict]) -> StaticReplyGate:
@@ -10,15 +10,15 @@ def _gate_from_rules(rules: list[dict]) -> StaticReplyGate:
 
 def test_parse_match_type_values() -> None:
     assert parse_match_type("exact") is StaticRuleMatchType.EXACT
-    assert parse_match_type("alias") is StaticRuleMatchType.EXACT
     assert parse_match_type("prefix") is StaticRuleMatchType.PREFIX
     assert parse_match_type("regex") is StaticRuleMatchType.REGEX
     assert (
         parse_match_type("exact_with_trailing_punctuation")
         is StaticRuleMatchType.EXACT_WITH_TRAILING_PUNCTUATION
     )
-    assert parse_match_type("exact_or_alias") is StaticRuleMatchType.EXACT
     assert parse_match_type(None) is StaticRuleMatchType.EXACT
+    assert parse_match_type("alias") is None
+    assert parse_match_type("exact_or_alias") is None
     assert parse_match_type("unknown") is None
 
 
@@ -133,11 +133,11 @@ def test_invalid_match_type_is_skipped() -> None:
     assert gate.match("你好", persona_tag="default") is None
 
 
-def test_legacy_exact_or_alias_still_works() -> None:
+def test_unsupported_match_types_are_skipped() -> None:
     gate = _gate_from_rules(
         [
             {
-                "rule_id": "legacy.reply.001",
+                "rule_id": "unsupported.reply.001",
                 "match": {"type": "exact_or_alias", "patterns": ["谢谢"]},
                 "negative_examples": [],
                 "replies": {"default": ["不客气！"]},
@@ -146,6 +146,4 @@ def test_legacy_exact_or_alias_still_works() -> None:
         ]
     )
 
-    result = gate.match("谢谢", persona_tag="default")
-    assert result is not None
-    assert result.text == "不客气！"
+    assert gate.match("谢谢", persona_tag="default") is None
