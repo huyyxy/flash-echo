@@ -65,7 +65,7 @@ class ConversationSample:
 
 
 class FillerPrefixSFTDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
-    """MiniMind3 ShareGPT SFT：仅对 assistant 段计算 loss。"""
+    """ShareGPT SFT：仅对 assistant 内容段计算 loss。"""
 
     def __init__(
         self,
@@ -77,16 +77,6 @@ class FillerPrefixSFTDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
         self.samples = samples
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
-        if tokenizer.bos_token is None or tokenizer.eos_token is None:
-            raise ValueError("tokenizer must define bos_token and eos_token")
-        self.assistant_bos_ids = tokenizer(
-            f"{tokenizer.bos_token}assistant\n",
-            add_special_tokens=False,
-        ).input_ids
-        self.assistant_eos_ids = tokenizer(
-            f"{tokenizer.eos_token}\n",
-            add_special_tokens=False,
-        ).input_ids
         pad_id = tokenizer.pad_token_id
         if pad_id is None:
             raise ValueError("tokenizer must define pad_token_id")
@@ -101,32 +91,58 @@ class FillerPrefixSFTDataset(Dataset[tuple[torch.Tensor, torch.Tensor]]):
             add_generation_prompt=False,
         )
 
-    def _generate_labels(self, input_ids: list[int]) -> list[int]:
+    def _assistant_spans(
+        self,
+        rendered_chat: str,
+        conversations: list[dict[str, str]],
+    ) -> list[tuple[int, int]]:
+        spans: list[tuple[int, int]] = []
+        cursor = 0
+        for message in conversations:
+            if message.get("role") != "assistant":
+                continue
+            content = message.get("content", "")
+            if not content:
+                continue
+            start = rendered_chat.find(content, cursor)
+            if start < 0:
+                raise ValueError("assistant content could not be located in rendered chat template")
+            end = start + len(content)
+            spans.append((start, end))
+            cursor = end
+        return spans
+
+    def _generate_labels(
+        self,
+        input_ids: list[int],
+        offsets: list[tuple[int, int]],
+        assistant_spans: list[tuple[int, int]],
+    ) -> list[int]:
         labels = [-100] * len(input_ids)
-        bos = self.assistant_bos_ids
-        eos = self.assistant_eos_ids
-        index = 0
-        while index < len(input_ids):
-            if input_ids[index : index + len(bos)] == bos:
-                start = index + len(bos)
-                end = start
-                while end < len(input_ids):
-                    if input_ids[end : end + len(eos)] == eos:
-                        break
-                    end += 1
-                upper = min(end + len(eos), self.max_seq_len)
-                for position in range(start, upper):
+        for position, (token_start, token_end) in enumerate(offsets):
+            if token_start == token_end:
+                continue
+            for span_start, span_end in assistant_spans:
+                if token_start < span_end and token_end > span_start:
                     labels[position] = input_ids[position]
-                index = end + len(eos) if end < len(input_ids) else len(input_ids)
-            else:
-                index += 1
+                    break
         return labels
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor]:
         conversations = self.samples[index].conversations
         prompt = self._render_chat(conversations)
-        input_ids = self.tokenizer(prompt, add_special_tokens=False).input_ids[: self.max_seq_len]
-        labels = self._generate_labels(input_ids)
+        encoded = self.tokenizer(
+            prompt,
+            add_special_tokens=False,
+            return_offsets_mapping=True,
+        )
+        input_ids = encoded.input_ids[: self.max_seq_len]
+        offsets = encoded.offset_mapping[: self.max_seq_len]
+        labels = self._generate_labels(
+            input_ids,
+            offsets,
+            self._assistant_spans(prompt, conversations),
+        )
         return (
             torch.tensor(input_ids, dtype=torch.long),
             torch.tensor(labels, dtype=torch.long),
