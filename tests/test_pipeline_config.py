@@ -32,8 +32,14 @@ def test_runner_lists_configured_models() -> None:
 
     assert "minimind3" in runner.list_models()
     assert "qwen3_5_0_8b" in runner.list_models()
-    assert "finetune" in runner.pipeline_steps("minimind3", "train")
-    assert "finetune" in runner.pipeline_steps("qwen3_5_0_8b", "train")
+    assert runner.pipeline_steps("minimind3", "download") == ["download_pretrained"]
+    assert runner.pipeline_steps("qwen3_5_0_8b", "download") == ["download_pretrained"]
+    assert runner.pipeline_steps("minimind3", "train") == ["download_pretrained", "finetune"]
+    assert runner.pipeline_steps("qwen3_5_0_8b", "train") == ["download_pretrained", "finetune"]
+    assert runner.pipeline_steps("minimind3", "export") == ["export_onnx"]
+    assert runner.pipeline_steps("qwen3_5_0_8b", "export") == ["export_onnx"]
+    assert runner.pipeline_steps("minimind3", "infer") == ["serve"]
+    assert runner.pipeline_steps("qwen3_5_0_8b", "infer") == ["serve"]
     assert runner.pipeline_steps("minimind3", "upload_checkpoint") == ["upload_checkpoint"]
     assert runner.pipeline_steps("minimind3", "upload_model") == ["upload_deploy"]
     assert runner.pipeline_steps("qwen3_5_0_8b", "download_deploy") == ["download_deploy"]

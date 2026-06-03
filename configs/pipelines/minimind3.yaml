@@ -27,11 +27,12 @@ pipelines:
   data:
     - clean_data
     - audit_data
+  download:
+    - download_pretrained
   train:
     - download_pretrained
     - finetune
   export:
-    - build_export_image
     - export_onnx
   upload_checkpoint:
     - upload_checkpoint

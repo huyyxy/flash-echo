@@ -42,10 +42,8 @@ pipelines:
     - download_pretrained
   train:
     - download_pretrained
-    - build_train_image
     - finetune
   export:
-    - build_export_image
     - export_onnx
   upload_checkpoint:
     - upload_checkpoint
@@ -60,7 +58,6 @@ pipelines:
   download_model:
     - download_deploy
   infer:
-    - build_infer_image
     - serve
   full:
     - clean_data

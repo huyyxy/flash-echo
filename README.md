@@ -254,18 +254,24 @@ flash-echo-pipeline run minimind3.data \
 ```bash
 flash-echo-pipeline run minimind3.train \
   --persona male_white_collar \
-  --runtime docker.cuda \
   --resume
 ```
+
+`minimind3.train` 只执行预训练模型下载和微调。训练镜像需要提前用
+`flash-echo-pipeline image build minimind3.train` 构建，或者通过 `full` pipeline
+中的 `build_train_image` step 构建。
 
 导出 ONNX deploy bundle：
 
 ```bash
 flash-echo-pipeline run minimind3.export \
   --persona male_white_collar \
-  --runtime docker.cpu \
   --resume
 ```
+
+`minimind3.export` 只执行 ONNX 导出。导出镜像需要提前用
+`flash-echo-pipeline image build minimind3.export` 构建，或者通过 `full` pipeline
+中的 `build_export_image` step 构建。
 
 完整流程：
 
@@ -309,9 +315,10 @@ flash-echo-pipeline run qwen3_5_0_8b.train \
   --resume
 ```
 
-`qwen3_5_0_8b.train` 会按 pipeline 配置分别使用本地 Docker build 和训练容器；
-不要在整条 pipeline 上覆盖为 `--runtime docker.qwen-train`。如果训练镜像和预训练模型
-都已经准备好，只想继续训练 step，可以从 `finetune` 开始：
+`qwen3_5_0_8b.train` 只执行预训练模型下载和微调。训练镜像需要提前用
+`flash-echo-pipeline image build qwen3_5_0_8b.train` 构建，或者通过 `full` pipeline
+中的 `build_train_image` step 构建。如果预训练模型已经准备好，只想继续训练 step，
+可以从 `finetune` 开始：
 
 ```bash
 flash-echo-pipeline run qwen3_5_0_8b.train \
@@ -325,9 +332,12 @@ flash-echo-pipeline run qwen3_5_0_8b.train \
 ```bash
 flash-echo-pipeline run qwen3_5_0_8b.export \
   --persona male_white_collar \
-  --runtime docker.qwen-export \
   --resume
 ```
+
+`qwen3_5_0_8b.export` 只执行 ONNX / ORT GenAI 导出。导出镜像需要提前用
+`flash-echo-pipeline image build qwen3_5_0_8b.export` 构建，或者通过 `full` pipeline
+中的 `build_export_image` step 构建。
 
 启动推理服务：
 
@@ -335,6 +345,10 @@ flash-echo-pipeline run qwen3_5_0_8b.export \
 flash-echo-pipeline run qwen3_5_0_8b.infer \
   --runtime docker.qwen-infer
 ```
+
+`qwen3_5_0_8b.infer` 只启动推理服务。推理镜像需要提前用
+`flash-echo-pipeline image build qwen3_5_0_8b.infer` 构建，或者通过 `full` pipeline
+中的 `build_infer_image` step 构建。
 
 ### 单步执行
 
