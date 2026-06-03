@@ -174,6 +174,71 @@ flash-echo-pipeline image pull qwen3_5_0_8b.infer
 flash-echo-pipeline image push qwen3_5_0_8b.infer
 ```
 
+### 模型产物 COS 同步
+
+微调 checkpoint 和 ONNX deploy bundle 可以同步到腾讯云 COS：
+
+```text
+https://weights-1305049745.cos.ap-shanghai.myqcloud.com
+```
+
+在项目根目录 `.env` 中配置 COS 密钥：
+
+```bash
+QCLOUD_SECRET_ID='your-secret-id'
+QCLOUD_SECRET_KEY='your-secret-key'
+```
+
+COS 远端路径按基础模型、微调版本和 persona 组织：
+
+```text
+flash-echo/<base_model>/<version>/<persona>/checkpoint/best/
+flash-echo/<base_model>/<version>/<persona>/deploy/
+```
+
+示例路径：
+
+```text
+flash-echo/minimind3/v1.0.0/male_white_collar/checkpoint/best/
+flash-echo/qwen3_5_0_8b/v1.0.0/male_white_collar/deploy/
+```
+
+训练后上传 checkpoint：
+
+```bash
+flash-echo-pipeline run minimind3.upload_checkpoint \
+  --persona male_white_collar
+
+flash-echo-pipeline run qwen3_5_0_8b.upload_checkpoint \
+  --persona male_white_collar
+```
+
+导出后上传 deploy bundle：
+
+```bash
+flash-echo-pipeline run minimind3.upload_deploy \
+  --persona male_white_collar
+
+flash-echo-pipeline run qwen3_5_0_8b.upload_deploy \
+  --persona male_white_collar
+```
+
+`upload_model` 是 `upload_deploy` 的别名，表示上传推理服务实际消费的模型包。
+
+在新机器上恢复产物：
+
+```bash
+flash-echo-pipeline run minimind3.download_checkpoint \
+  --persona male_white_collar \
+  --resume
+
+flash-echo-pipeline run qwen3_5_0_8b.download_deploy \
+  --persona male_white_collar \
+  --resume
+```
+
+`download_model` 是 `download_deploy` 的别名，适合直接恢复推理所需模型包。
+
 ### MiniMind3 流程
 
 数据准备：
@@ -338,3 +403,6 @@ Docker runtime 会默认把项目目录挂载到容器内 `/workspace`。
 | `FILLER_DEPLOY_ROOT` | `models/deploy/` | ONNX 部署包根目录 |
 | `FILLER_HOST` | `0.0.0.0` | 服务监听地址 |
 | `FILLER_PORT` | `8000` | 服务端口 |
+| `QCLOUD_SECRET_ID` | 无 | 腾讯云 COS SecretId，用于模型产物上传/下载 |
+| `QCLOUD_SECRET_KEY` | 无 | 腾讯云 COS SecretKey，用于模型产物上传/下载 |
+| `QCLOUD_TOKEN` | 无 | 临时密钥 token，可选 |

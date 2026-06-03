@@ -10,6 +10,13 @@ paths:
   checkpoint: models/checkpoints/qwen3_5_0_8b-filler-{persona}-v1.0.0/best
   deploy_dir: models/deploy/qwen3_5_0_8b-filler-{persona_dash}-v1.0.0-onnx
 
+cos:
+  bucket_url: https://weights-1305049745.cos.ap-shanghai.myqcloud.com
+  remote_root: flash-echo
+  base_model: qwen3_5_0_8b
+  checkpoint_prefix: "{cos.remote_root}/{cos.base_model}/{version}/{persona}/checkpoint/best"
+  deploy_prefix: "{cos.remote_root}/{cos.base_model}/{version}/{persona}/deploy"
+
 train:
   epochs: 3
   batch_size: 4
@@ -40,6 +47,18 @@ pipelines:
   export:
     - build_export_image
     - export_onnx
+  upload_checkpoint:
+    - upload_checkpoint
+  download_checkpoint:
+    - download_checkpoint
+  upload_deploy:
+    - upload_deploy
+  download_deploy:
+    - download_deploy
+  upload_model:
+    - upload_deploy
+  download_model:
+    - download_deploy
   infer:
     - build_infer_image
     - serve
@@ -146,6 +165,39 @@ steps:
       - "{paths.checkpoint}/model_card.json"
     resume: true
 
+  upload_checkpoint:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/storage/cos_model_sync.py
+      - upload
+      - --local-dir
+      - "{paths.checkpoint}"
+      - --remote-prefix
+      - "{cos.checkpoint_prefix}"
+      - --bucket-url
+      - "{cos.bucket_url}"
+    inputs:
+      - "{paths.checkpoint}/model_card.json"
+    outputs: []
+    resume: false
+
+  download_checkpoint:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/storage/cos_model_sync.py
+      - download
+      - --local-dir
+      - "{paths.checkpoint}"
+      - --remote-prefix
+      - "{cos.checkpoint_prefix}"
+      - --bucket-url
+      - "{cos.bucket_url}"
+    outputs:
+      - "{paths.checkpoint}/model_card.json"
+    resume: true
+
   build_export_image:
     runtime: local
     image: qwen3_5_0_8b.export
@@ -179,6 +231,39 @@ steps:
       - "{export.execution_provider}"
     inputs:
       - "{paths.checkpoint}/model_card.json"
+    outputs:
+      - "{paths.deploy_dir}/genai_config.json"
+    resume: true
+
+  upload_deploy:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/storage/cos_model_sync.py
+      - upload
+      - --local-dir
+      - "{paths.deploy_dir}"
+      - --remote-prefix
+      - "{cos.deploy_prefix}"
+      - --bucket-url
+      - "{cos.bucket_url}"
+    inputs:
+      - "{paths.deploy_dir}/genai_config.json"
+    outputs: []
+    resume: false
+
+  download_deploy:
+    runtime: docker.cpu
+    command:
+      - python3
+      - tools/storage/cos_model_sync.py
+      - download
+      - --local-dir
+      - "{paths.deploy_dir}"
+      - --remote-prefix
+      - "{cos.deploy_prefix}"
+      - --bucket-url
+      - "{cos.bucket_url}"
     outputs:
       - "{paths.deploy_dir}/genai_config.json"
     resume: true
