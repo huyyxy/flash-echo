@@ -306,7 +306,17 @@ flash-echo-pipeline run qwen3_5_0_8b.download \
 ```bash
 flash-echo-pipeline run qwen3_5_0_8b.train \
   --persona male_white_collar \
-  --runtime docker.qwen-train \
+  --resume
+```
+
+`qwen3_5_0_8b.train` 会按 pipeline 配置分别使用本地 Docker build 和训练容器；
+不要在整条 pipeline 上覆盖为 `--runtime docker.qwen-train`。如果训练镜像和预训练模型
+都已经准备好，只想继续训练 step，可以从 `finetune` 开始：
+
+```bash
+flash-echo-pipeline run qwen3_5_0_8b.train \
+  --persona male_white_collar \
+  --from finetune \
   --resume
 ```
 
