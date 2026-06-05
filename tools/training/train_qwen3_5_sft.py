@@ -1,8 +1,7 @@
 """Fine-tune Qwen3.5-0.8B on filler-prefix SFT data.
 
-This script reuses the generic causal-LM SFT implementation from
-``train_minimind3_sft.py`` while providing Qwen-specific default paths and
-model version names.
+This script uses the shared filler-prefix SFT trainer while providing
+Qwen-specific default paths and model version names.
 
 Example::
 
@@ -17,7 +16,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import train_minimind3_sft as sft
+import filler_prefix_sft as sft
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -47,18 +46,18 @@ def resolve_paths(args: argparse.Namespace) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = sft.parse_args()
-    parser.persona = parser.persona or DEFAULT_PERSONA
-    return parser
+    args = sft.parse_args(description="SFT fine-tune Qwen3.5-0.8B for filler prefixes.")
+    args.persona = args.persona or DEFAULT_PERSONA
+    return args
 
 
 def main() -> int:
-    sft.DEFAULT_PRETRAINED = DEFAULT_PRETRAINED
-    sft.DEFAULT_FILLER_DATA_ROOT = DEFAULT_FILLER_DATA_ROOT
-    sft.DEFAULT_PERSONA = DEFAULT_PERSONA
-    sft.default_base_model = default_base_model
-    sft.resolve_paths = resolve_paths
-    return sft.main()
+    return sft.main(
+        parse_args=parse_args,
+        default_base_model=default_base_model,
+        resolve_paths=resolve_paths,
+        template_dependency_name="Qwen3.5 chat template",
+    )
 
 
 if __name__ == "__main__":
