@@ -487,8 +487,6 @@ docker/
     Dockerfile.cuda
 ```
 
-当前项目根目录下已有的 `Dockerfile.qwen3_5_0_8b.export` 和 `Dockerfile.qwen3_5_0_8b.infer` 可在重构时迁移到 `docker/qwen3_5_0_8b/`。
-
 ## 9. 命令行设计
 
 ### 9.1 查看可用流水线
