@@ -21,6 +21,7 @@ train:
   epochs: 3
   batch_size: 4
   eval_batch_size: 8
+  save_epoch_checkpoint_interval: 1
   use_lora: false
   lora_r: 16
 
@@ -185,6 +186,8 @@ steps:
       - "{train.batch_size}"
       - --eval-batch-size
       - "{train.eval_batch_size}"
+      - --save-epoch-checkpoint-interval
+      - "{train.save_epoch_checkpoint_interval}"
     inputs:
       - "{paths.cleaned_data_dir}/train.jsonl"
       - "{paths.cleaned_data_dir}/valid.jsonl"
@@ -218,6 +221,8 @@ steps:
       - "{train.batch_size}"
       - --eval-batch-size
       - "{train.eval_batch_size}"
+      - --save-epoch-checkpoint-interval
+      - "{train.save_epoch_checkpoint_interval}"
     inputs:
       - "{paths.cleaned_data_dir}/train.jsonl"
       - "{paths.cleaned_data_dir}/valid.jsonl"

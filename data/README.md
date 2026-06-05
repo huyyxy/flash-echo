@@ -97,6 +97,37 @@ python3 tools/training/prepare_sharegpt_filler_prefix.py --max-records 50 --over
 
 更多参数见：`python3 tools/training/prepare_sharegpt_filler_prefix.py --help`。
 
+### 训练前重平衡高频垫话
+
+生成和审核后的数据可能出现大量重复泛化前缀，例如 `这个问题,`、`让我想想,`、`好的,`。
+训练前可先用本地规则做确定性降采样，降低模型学成模板循环的风险：
+
+```bash
+python3 tools/training/rebalance_filler_prefix.py \
+  --data-dir data/filler_prefix/male_white_collar \
+  --dry-run
+```
+
+确认报告后写回原目录：
+
+```bash
+python3 tools/training/rebalance_filler_prefix.py \
+  --data-dir data/filler_prefix/male_white_collar \
+  --max-exact 50 \
+  --max-generic-ratio 0.25 \
+  --overwrite-error
+```
+
+如需在重平衡后进一步让 LLM 审核低信号样本与 `user_content` 是否贴合，可设置
+`.env` 中的 `OPENAI_API_KEY`、`OPENAI_BASE_URL`、`OPENAI_MODEL` 后追加：
+
+```bash
+python3 tools/training/rebalance_filler_prefix.py \
+  --data-dir data/filler_prefix/male_white_collar \
+  --llm-audit \
+  --llm-mode uncertain
+```
+
 后台长时间运行示例：
 
 ```bash

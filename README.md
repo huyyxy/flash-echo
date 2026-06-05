@@ -182,6 +182,11 @@ flash-echo-pipeline run minimind3.train \
   --resume
 ```
 
+MiniMind3 训练也可以在 `configs/pipelines/minimind3.yaml` 的
+`train.save_epoch_checkpoint_interval` 中控制中间 checkpoint 保存频率：`0`
+表示不保存中间 checkpoint，`1` 表示每个 epoch 保存一次，`2` 表示每 2 个
+epoch 保存一次，以此类推。
+
 训练后上传 checkpoint：
 
 ```bash
@@ -276,6 +281,13 @@ flash-echo-pipeline run qwen3_5_0_8b.train \
   --from finetune \
   --resume
 ```
+
+Qwen 训练会在每个 epoch 后保存中间 checkpoint 到
+`models/checkpoints/qwen3_5_0_8b-filler-<persona>-<version>/epoch-0001/`
+等目录；后续导出和上传仍默认使用验证集最优的 `best/`。可以在
+`configs/pipelines/qwen3_5_0_8b.yaml` 的 `train.save_epoch_checkpoint_interval`
+中控制保存频率：`0` 表示不保存中间 checkpoint，`1` 表示每个 epoch 保存一次，
+`2` 表示每 2 个 epoch 保存一次，以此类推。
 
 训练后上传 checkpoint：
 

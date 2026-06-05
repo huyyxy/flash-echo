@@ -237,6 +237,15 @@ def parse_args(*, description: str) -> argparse.Namespace:
         help="Also save the final epoch under output-dir/last.",
     )
     parser.add_argument(
+        "--save-epoch-checkpoint-interval",
+        type=int,
+        default=0,
+        help=(
+            "Save model weights every N epochs under output-dir/epoch-XXXX. "
+            "0 disables intermediate epoch checkpoints."
+        ),
+    )
+    parser.add_argument(
         "--max-train-samples",
         type=int,
         default=None,
@@ -277,6 +286,8 @@ def validate_args(
         raise ValueError("warmup-ratio must be in [0, 1)")
     if args.max_seq_len <= 0:
         raise ValueError("max-seq-len must be greater than 0")
+    if args.save_epoch_checkpoint_interval < 0:
+        raise ValueError("save-epoch-checkpoint-interval must be non-negative")
     for path in (args.train, args.valid):
         if not path.exists():
             raise FileNotFoundError(f"required data split does not exist: {path}")
@@ -492,6 +503,25 @@ def save_checkpoint(
     output_dir.mkdir(parents=True, exist_ok=True)
     model.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
+
+
+def save_epoch_metadata(
+    output_dir: Path,
+    *,
+    epoch: int,
+    train_loss: float,
+    valid_metrics: dict[str, float],
+) -> None:
+    metadata = {
+        "epoch": epoch,
+        "train_loss": train_loss,
+        "valid_metrics": valid_metrics,
+        "created_at_unix": int(time.time()),
+    }
+    (output_dir / "training_state.json").write_text(
+        json.dumps(metadata, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def save_model_card(
@@ -733,6 +763,20 @@ def main(
                 key: value.detach().cpu().clone() for key, value in model.state_dict().items()
             }
             print(f"  updated best checkpoint candidate for {best_dir}")
+
+        if (
+            args.save_epoch_checkpoint_interval > 0
+            and epoch % args.save_epoch_checkpoint_interval == 0
+        ):
+            epoch_dir = args.output_dir / f"epoch-{epoch:04d}"
+            save_checkpoint(epoch_dir, model=model, tokenizer=tokenizer)
+            save_epoch_metadata(
+                epoch_dir,
+                epoch=epoch,
+                train_loss=train_loss,
+                valid_metrics=valid_metrics,
+            )
+            print(f"  saved epoch checkpoint: {epoch_dir}")
 
     if args.save_last:
         save_checkpoint(args.output_dir / "last", model=model, tokenizer=tokenizer)

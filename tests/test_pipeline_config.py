@@ -231,6 +231,25 @@ def test_qwen_train_dry_run_uses_filler_prefix_sft_script() -> None:
     assert "data/filler_prefix/male_white_collar/train.jsonl" in result.command
 
 
+def test_minimind3_train_dry_run_uses_epoch_checkpoint_interval() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    result = runner.run_step(
+        model="minimind3",
+        step_name="finetune",
+        persona="male_white_collar",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert result.status == "dry-run"
+    assert "tools/training/train_minimind3_sft.py" in result.command
+    assert "--save-epoch-checkpoint-interval" in result.command
+    assert "1" in result.command
+
+
 def test_qwen_cu128_train_dry_run_uses_cu128_runtime() -> None:
     runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
 
@@ -248,6 +267,8 @@ def test_qwen_cu128_train_dry_run_uses_cu128_runtime() -> None:
     assert result.runtime == "docker.qwen-train-cu128"
     assert "ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-train-cu128" in result.command
     assert "tools/training/train_qwen3_5_sft.py" in result.command
+    assert "--save-epoch-checkpoint-interval" in result.command
+    assert "1" in result.command
 
 
 def test_minimind3_upload_checkpoint_dry_run_uses_cos_prefix() -> None:
