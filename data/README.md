@@ -4,6 +4,7 @@
 
 ```text
 raw/                        未标注或原始 ShareGPT 语料
+chat/                       闲聊/寒暄等直接回答 SFT 数据（路由负样本）
 filler_prefix/<persona>/    MiniMind3 短垫话前缀 SFT 数据（按 Persona 分目录）
 hard_cases/                 每次模型迭代固定使用的回归样本（不参与默认训练流水线）
 ```
@@ -156,6 +157,12 @@ PYTHONUNBUFFERED=1 nohup python3 -u tools/training/prepare_sharegpt_filler_prefi
 ```
 
 训练时损失仅在 `assistant` 回复 token 上计算；Persona 风格由数据目录和独立模型版本体现，不作为单次推理的文本输入参数。
+
+## 闲聊直接回答数据
+
+`data/chat/` 存放路由训练中的直接回答负样本，使用相同的 ShareGPT `conversations` JSONL 格式。
+每条样本包含一条口语化用户输入和一条完整助手回复，助手回复不包含 `<CONTINUE_MAIN>`，可与
+`data/filler_prefix/<persona>/` 的垫词路由样本按比例混合。
 
 ## 训练与导出
 
