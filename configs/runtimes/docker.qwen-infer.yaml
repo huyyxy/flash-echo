@@ -6,8 +6,8 @@ platform: linux/amd64
 gpu: none
 workdir: /workspace
 ports:
-  - host: 8080
-    container: 8080
+  - host: 8000
+    container: 8000
 mounts:
   - source: .
     target: /workspace

@@ -87,7 +87,7 @@ uvicorn flash_echo.app:create_app --factory --reload
 curl -X POST http://127.0.0.1:8000/v1/chat/completions \
   -H "content-type: application/json" \
   -d '{
-    "model": "filler-reply-minimind3",
+    "model": "filler-reply",
     "messages": [{"role": "user", "content": "你怎么看 AI 对教育行业的影响？"}],
     "metadata": {"persona_tag": "male_white_collar", "request_id": "req-001"}
   }'

@@ -43,10 +43,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from typing import Any
@@ -56,6 +58,8 @@ DEFAULT_MODEL_DIR = PROJECT_ROOT / "models/pretrained/Qwen-Qwen3.5-0.8B"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / "models/deploy/qwen3.5-0.8b-v1.0.0"
 DEFAULT_MODEL_VERSION = "qwen3.5-0.8b-v1.0.0"
 MIN_TRANSFORMERS_VERSION = (5, 3, 0)
+ORTGENAI_QWEN35_TEXT_ARCH = "Qwen3_5ForCausalLM"
+ORTGENAI_QWEN35_BUILDER_ARCH = "Qwen3_5ForConditionalGeneration"
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
@@ -245,12 +249,59 @@ def genai_builder_command(args: argparse.Namespace) -> list[str]:
     return [sys.executable, "-m", "onnxruntime_genai.models.builder"]
 
 
+def needs_ortgenai_qwen35_text_arch_compat(model_dir: Path) -> bool:
+    config = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))
+    architectures = config.get("architectures") or []
+    return (
+        config.get("model_type") == "qwen3_5_text"
+        and architectures[:1] == [ORTGENAI_QWEN35_TEXT_ARCH]
+    )
+
+
+def create_ortgenai_qwen35_text_compat_dir(
+    model_dir: Path,
+    *,
+    parent_dir: Path,
+) -> tuple[tempfile.TemporaryDirectory[str], Path]:
+    temp_dir = tempfile.TemporaryDirectory(
+        prefix=".qwen35-ortgenai-",
+        dir=str(parent_dir),
+    )
+    temp_path = Path(temp_dir.name)
+    source_dir = model_dir.resolve()
+
+    for source_path in source_dir.iterdir():
+        if source_path.name == "config.json":
+            continue
+        target_path = temp_path / source_path.name
+        relative_source = os.path.relpath(source_path, start=temp_path)
+        os.symlink(relative_source, target_path)
+
+    config = json.loads((source_dir / "config.json").read_text(encoding="utf-8"))
+    config["architectures"] = [ORTGENAI_QWEN35_BUILDER_ARCH]
+    write_json(temp_path / "config.json", config)
+
+    return temp_dir, temp_path
+
+
 def export_with_onnxruntime_genai(args: argparse.Namespace) -> None:
+    temp_model_dir: tempfile.TemporaryDirectory[str] | None = None
+    model_dir = args.model_dir
+    if needs_ortgenai_qwen35_text_arch_compat(args.model_dir):
+        temp_model_dir, model_dir = create_ortgenai_qwen35_text_compat_dir(
+            args.model_dir,
+            parent_dir=args.output_dir.parent,
+        )
+        print(
+            "using temporary Qwen3.5 text-only config compatibility directory for "
+            "onnxruntime-genai builder"
+        )
+
     command = genai_builder_command(args)
     command.extend(
         [
             "-i",
-            str(args.model_dir),
+            str(model_dir),
             "-o",
             str(args.output_dir),
             "-p",
@@ -266,7 +317,11 @@ def export_with_onnxruntime_genai(args: argparse.Namespace) -> None:
 
     print("running onnxruntime-genai builder:")
     print(" ", " ".join(command))
-    subprocess.run(command, check=True)
+    try:
+        subprocess.run(command, check=True)
+    finally:
+        if temp_model_dir is not None:
+            temp_model_dir.cleanup()
 
 
 def optimum_available() -> bool:

@@ -15,18 +15,18 @@
     python3 tools/inference/serve_qwen3_5_onnx_openai.py \\
       --model-dir models/deploy/qwen3.5-0.8b-v1.0.0 \\
       --host 0.0.0.0 \\
-      --port 8080
+      --port 8000
 
 调用示例::
 
-    curl -s http://127.0.0.1:8080/v1/chat/completions \\
+    curl -s http://127.0.0.1:8000/v1/chat/completions \\
       -H 'content-type: application/json' \\
       -d '{
         "model": "qwen3.5-0.8b",
         "messages": [{"role": "user", "content": "用一句话介绍你自己"}]
       }'
 
-    curl -N http://127.0.0.1:8080/v1/chat/completions \\
+    curl -N http://127.0.0.1:8000/v1/chat/completions \\
       -H 'content-type: application/json' \\
       -d '{
         "model": "qwen3.5-0.8b",
@@ -203,7 +203,7 @@ def parse_args() -> argparse.Namespace:
         help=f"Model id exposed by /v1/models (default: {DEFAULT_MODEL_NAME}).",
     )
     parser.add_argument("--host", default="127.0.0.1", help="HTTP listen host.")
-    parser.add_argument("--port", type=int, default=8080, help="HTTP listen port.")
+    parser.add_argument("--port", type=int, default=8000, help="HTTP listen port.")
     parser.add_argument(
         "--max-context-tokens",
         type=int,
@@ -449,17 +449,6 @@ def create_app(settings: ServerSettings, runtime: LoadedRuntime) -> FastAPI:
 
     @app.post("/v1/chat/completions")
     def chat_completions(request: ChatCompletionRequest = Body(...)) -> Any:
-        if request.model != settings.model_name:
-            raise HTTPException(
-                status_code=404,
-                detail=error_payload(
-                    message=f"The model `{request.model}` does not exist.",
-                    error_type="invalid_request_error",
-                    param="model",
-                    code="model_not_found",
-                ),
-            )
-
         try:
             inference_args = build_inference_args(settings, request)
             message_dicts = messages_to_dicts(request.messages)

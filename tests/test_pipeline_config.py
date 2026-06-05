@@ -128,6 +128,27 @@ def test_minimind3_infer_uses_infer_runtime_with_port_mapping() -> None:
     assert "8000:8000" in result.command
 
 
+def test_qwen_infer_uses_same_default_port_as_minimind3() -> None:
+    runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
+
+    result = runner.run_step(
+        model="qwen3_5_0_8b",
+        step_name="serve",
+        persona="male_white_collar",
+        runtime_override=None,
+        resume=False,
+        force=False,
+        dry_run=True,
+    )
+
+    assert result.runtime == "docker.qwen-infer"
+    assert "ccr.ccs.tencentyun.com/huyyxy/flash-echo:qwen3_5_0_8b-infer" in result.command
+    assert "-p" in result.command
+    assert "8000:8000" in result.command
+    assert "--port" in result.command
+    assert "8000" in result.command
+
+
 def test_runner_can_push_runtime_image_command() -> None:
     runner = PipelineRunner(ProjectPaths.discover(PROJECT_ROOT))
 
