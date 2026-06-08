@@ -287,9 +287,11 @@ def test_minimind3_upload_checkpoint_dry_run_uses_cos_prefix() -> None:
     assert result.status == "dry-run"
     assert "tools/storage/cos_model_sync.py" in result.command
     assert "upload" in result.command
-    assert "models/checkpoints/minimind3-filler-male_white_collar-v1.0.0/best" in result.command
-    assert "flash-echo/minimind3/v1.0.0/male_white_collar/checkpoint/best" in result.command
+    assert "models/checkpoints/minimind3-filler-male_white_collar-v1.0.1/best" in result.command
+    assert "flash-echo/minimind3/v1.0.1/male_white_collar/checkpoint/best" in result.command
     assert "https://weights-1305049745.cos.ap-shanghai.myqcloud.com" in result.command
+    assert "--timeout" in result.command
+    assert "600" in result.command
 
 
 def test_qwen_download_deploy_dry_run_uses_cos_prefix() -> None:
@@ -308,8 +310,8 @@ def test_qwen_download_deploy_dry_run_uses_cos_prefix() -> None:
     assert result.status == "dry-run"
     assert "tools/storage/cos_model_sync.py" in result.command
     assert "download" in result.command
-    assert "models/deploy/qwen3_5_0_8b-filler-company-v1.0.0-onnx" in result.command
-    assert "flash-echo/qwen3_5_0_8b/v1.0.0/company/deploy" in result.command
+    assert "models/deploy/qwen3_5_0_8b-filler-company-v1.0.1-onnx" in result.command
+    assert "flash-echo/qwen3_5_0_8b/v1.0.1/company/deploy" in result.command
 
 
 def test_pipeline_version_renders_training_and_storage_paths(monkeypatch) -> None:

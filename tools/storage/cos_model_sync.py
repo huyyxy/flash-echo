@@ -23,11 +23,13 @@ import urllib.request
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import BinaryIO, Callable, Iterable
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_BUCKET_URL = "https://weights-1305049745.cos.ap-shanghai.myqcloud.com"
+DEFAULT_PROGRESS_INTERVAL_MB = 64
+BYTES_PER_MB = 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -41,6 +43,47 @@ class Credentials:
 class CosObject:
     key: str
     size: int
+
+
+class ProgressReader:
+    def __init__(
+        self,
+        fileobj: BinaryIO,
+        *,
+        total_bytes: int,
+        label: str,
+        report_interval_mb: int = DEFAULT_PROGRESS_INTERVAL_MB,
+    ) -> None:
+        self.fileobj = fileobj
+        self.total_bytes = total_bytes
+        self.label = label
+        self.uploaded_bytes = 0
+        self.report_interval_bytes = report_interval_mb * BYTES_PER_MB
+        self.next_report_bytes = self.report_interval_bytes
+
+    def read(self, size: int = -1) -> bytes:
+        chunk = self.fileobj.read(size)
+        if chunk:
+            self.uploaded_bytes += len(chunk)
+            self._report_if_needed()
+        return chunk
+
+    def close(self) -> None:
+        self.fileobj.close()
+
+    def _report_if_needed(self) -> None:
+        if self.total_bytes <= 0:
+            return
+        if self.uploaded_bytes < self.next_report_bytes and self.uploaded_bytes < self.total_bytes:
+            return
+        print(
+            "upload progress "
+            f"{self.label}: {self.uploaded_bytes / BYTES_PER_MB:.1f}/"
+            f"{self.total_bytes / BYTES_PER_MB:.1f} MB",
+            file=sys.stderr,
+        )
+        while self.next_report_bytes <= self.uploaded_bytes:
+            self.next_report_bytes += self.report_interval_bytes
 
 
 def parse_args() -> argparse.Namespace:
@@ -149,10 +192,16 @@ class CosClient:
         self.timeout = timeout
 
     def upload_file(self, *, local_path: Path, key: str) -> None:
-        data = local_path.read_bytes()
-        request = self._request("PUT", key=key, data=data)
-        request.add_header("Content-Length", str(len(data)))
-        with self._urlopen(request, description=f"upload {key}") as response:
+        file_size = local_path.stat().st_size
+
+        def make_request() -> urllib.request.Request:
+            data = ProgressReader(local_path.open("rb"), total_bytes=file_size, label=key)
+            request = self._request("PUT", key=key, data=data)
+            request.add_header("Content-Length", str(file_size))
+            request.add_header("Content-Type", "application/octet-stream")
+            return request
+
+        with self._urlopen_factory(make_request, description=f"upload {key}") as response:
             if response.status not in {200, 201}:
                 raise RuntimeError(f"unexpected COS upload status {response.status}: {key}")
 
@@ -201,21 +250,35 @@ class CosClient:
             return response.read().decode("utf-8")
 
     def _urlopen(self, request: urllib.request.Request, *, description: str):
+        return self._urlopen_factory(lambda: request, description=description)
+
+    def _urlopen_factory(self, request_factory: Callable[[], urllib.request.Request], *, description: str):
         attempts = self.retries + 1
         for attempt in range(1, attempts + 1):
+            request = request_factory()
             try:
-                return urllib.request.urlopen(request, timeout=self.timeout)
+                response = urllib.request.urlopen(request, timeout=self.timeout)
+                self._close_request_data(request)
+                return response
             except urllib.error.HTTPError as error:
+                self._close_request_data(request)
                 if error.code not in {429, 500, 502, 503, 504} or attempt == attempts:
                     raise
                 error.close()
                 self._sleep_before_retry(description=description, attempt=attempt, attempts=attempts, error=error)
             except (urllib.error.URLError, ConnectionResetError, TimeoutError, socket.timeout, http.client.HTTPException) as error:
+                self._close_request_data(request)
                 if attempt == attempts:
                     raise
                 self._sleep_before_retry(description=description, attempt=attempt, attempts=attempts, error=error)
 
         raise RuntimeError(f"unreachable retry state for COS request: {description}")
+
+    def _close_request_data(self, request: urllib.request.Request) -> None:
+        data = getattr(request, "data", None)
+        close = getattr(data, "close", None)
+        if close is not None:
+            close()
 
     def _sleep_before_retry(self, *, description: str, attempt: int, attempts: int, error: BaseException) -> None:
         print(

@@ -243,6 +243,8 @@ steps:
       - "{cos.checkpoint_prefix}"
       - --bucket-url
       - "{cos.bucket_url}"
+      - --timeout
+      - "600"
     inputs:
       - "{paths.checkpoint}/model_card.json"
     outputs: []
@@ -315,6 +317,8 @@ steps:
       - "{cos.deploy_prefix}"
       - --bucket-url
       - "{cos.bucket_url}"
+      - --timeout
+      - "600"
     inputs:
       - "{paths.deploy_dir}/genai_config.json"
     outputs: []

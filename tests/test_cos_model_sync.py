@@ -55,3 +55,30 @@ def test_upload_file_retries_transient_connection_error(monkeypatch, tmp_path) -
 
     assert len(calls) == 2
     assert calls[0][1] == 30
+    assert not isinstance(calls[0][0].data, bytes)
+
+
+def test_upload_file_streams_data_and_reports_progress(monkeypatch, tmp_path, capsys) -> None:
+    local_path = tmp_path / "model.onnx.data"
+    local_path.write_bytes(b"x" * 1024 * 1024)
+    uploaded = bytearray()
+
+    def fake_urlopen(request, *, timeout):
+        while chunk := request.data.read(128 * 1024):
+            uploaded.extend(chunk)
+        return DummyResponse()
+
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+    client = cos_model_sync.CosClient(
+        bucket_url="https://weights-1305049745.cos.ap-shanghai.myqcloud.com",
+        credentials=cos_model_sync.Credentials(secret_id="secret-id", secret_key="secret-key"),
+        retries=0,
+        retry_wait=0,
+        timeout=600,
+    )
+
+    client.upload_file(local_path=local_path, key="flash-echo/model.onnx.data")
+
+    assert bytes(uploaded) == local_path.read_bytes()
+    assert "upload progress flash-echo/model.onnx.data: 1.0/1.0 MB" in capsys.readouterr().err
