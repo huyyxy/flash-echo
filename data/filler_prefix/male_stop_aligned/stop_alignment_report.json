@@ -1,0 +1,1159 @@
+{
+  "data_dir": "data/filler_prefix/male",
+  "output_dir": "data/filler_prefix/male_stop_aligned",
+  "seed": "42",
+  "splits": {
+    "train": {
+      "input": 185481,
+      "malformed": 0,
+      "rewritten": 41004,
+      "rewritten_by_reason": {
+        "candidate_topic_prefix": 41004
+      },
+      "top_before": [
+        [
+          "这个SQL查询,",
+          51
+        ],
+        [
+          "这个SQL查询可以这样写,",
+          51
+        ],
+        [
+          "好的,这个问题,",
+          50
+        ],
+        [
+          "说起来,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "好的,关于这个问题,",
+          50
+        ],
+        [
+          "这个问题很有趣,",
+          50
+        ],
+        [
+          "嗯,这个问题挺有意思,",
+          50
+        ],
+        [
+          "简单来说,",
+          50
+        ],
+        [
+          "这个问题嘛,",
+          50
+        ],
+        [
+          "这是个值得深思的问题,",
+          50
+        ],
+        [
+          "说到电影,",
+          50
+        ],
+        [
+          "这是个很现实的问题,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这是个值得思考的问题,",
+          50
+        ],
+        [
+          "关于这点,",
+          50
+        ],
+        [
+          "这个话题很有深度,",
+          50
+        ],
+        [
+          "关于时间管理,",
+          50
+        ],
+        [
+          "这个问题值得思考,",
+          50
+        ],
+        [
+          "今天天气确实不错,",
+          50
+        ]
+      ],
+      "top_after": [
+        [
+          "我先帮你理一下这个问题,",
+          85
+        ],
+        [
+          "我先简单梳理一下,",
+          82
+        ],
+        [
+          "这个问题可以先这样看,",
+          77
+        ],
+        [
+          "这件事可以先抓重点说,",
+          61
+        ],
+        [
+          "这个话题可以先这样看,",
+          56
+        ],
+        [
+          "这个SQL查询,",
+          51
+        ],
+        [
+          "这个SQL查询可以这样写,",
+          51
+        ],
+        [
+          "好的,这个问题,",
+          50
+        ],
+        [
+          "说起来,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "好的,关于这个问题,",
+          50
+        ],
+        [
+          "这个问题很有趣,",
+          50
+        ],
+        [
+          "嗯,这个问题挺有意思,",
+          50
+        ],
+        [
+          "简单来说,",
+          50
+        ],
+        [
+          "这个问题嘛,",
+          50
+        ],
+        [
+          "这是个值得深思的问题,",
+          50
+        ],
+        [
+          "这是个很现实的问题,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这是个值得思考的问题,",
+          50
+        ],
+        [
+          "这个话题很有深度,",
+          50
+        ]
+      ],
+      "examples": [
+        {
+          "line_no": 14,
+          "user": "最近有没有关于AI伦理的讨论?",
+          "before": "人工智能伦理的讨论热度不减,",
+          "after": "说到人工智能伦理的讨论热度不减,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 17,
+          "user": "你最喜欢哪种类型的电影?",
+          "before": "关于你喜欢的电影类型,",
+          "after": "你喜欢的电影类型这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 18,
+          "user": "你最近有没有看过什么值得回味的电影?",
+          "before": "关于最近看的电影,",
+          "after": "说到最近看的电影,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 19,
+          "user": "最近有没有读过让人思考的书?",
+          "before": "关于最近读的书,",
+          "after": "先从最近读的书这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 20,
+          "user": "最近有没有人写过关于时间旅行的科幻小说?",
+          "before": "关于时间旅行的科幻作品,",
+          "after": "时间旅行的科幻作品这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 21,
+          "user": "你是否考虑过模型在多语言支持上的局限性?",
+          "before": "关于模型的局限性,",
+          "after": "围绕模型的局限性,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 27,
+          "user": "你是否能处理多模态数据?",
+          "before": "关于多模态的处理,",
+          "after": "围绕多模态的处理,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 29,
+          "user": "你究竟是哪个模型?来自哪里?",
+          "before": "关于我的身份,",
+          "after": "先从我的身份这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 30,
+          "user": "你的真实身份是什么?来自哪里?由谁开发?",
+          "before": "关于我的背景,",
+          "after": "我的背景这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 35,
+          "user": "你了解我的工作原理吗?",
+          "before": "关于工作原理,",
+          "after": "关于工作原理,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 48,
+          "user": "你最近有没有遇到过需要快速解决但又不太确定如何下手的问题?",
+          "before": "关于最近遇到的难题,",
+          "after": "说到最近遇到的难题,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 49,
+          "user": "你的真实身份和开发背景是什么?",
+          "before": "关于你的身份背景,",
+          "after": "说到你的身份背景,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 50,
+          "user": "你如何处理数据中的异常值?",
+          "before": "关于异常值的处理,",
+          "after": "异常值的处理这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 59,
+          "user": "你是否基于真实开源模型进行微调?",
+          "before": "关于模型微调,",
+          "after": "说到模型微调,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 68,
+          "user": "最近有没有什么好喝的饮料推荐?",
+          "before": "关于饮料,",
+          "after": "关于饮料,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 69,
+          "user": "最近有没有推荐的甜品?",
+          "before": "关于甜品,",
+          "after": "关于甜品,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 72,
+          "user": "你是由谁打造的?",
+          "before": "关于我的来历,",
+          "after": "围绕我的来历,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 73,
+          "user": "最近有没有人因为太忙没时间吃饭?",
+          "before": "关于忙得没时间吃饭,",
+          "after": "先从忙得没时间吃饭这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 74,
+          "user": "最近有没有人因为工作太忙而没时间睡觉?",
+          "before": "关于工作太忙没时间睡觉,",
+          "after": "关于工作太忙没时间睡觉,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 84,
+          "user": "你是否曾想过,如果有一天所有人的手机都能互相共享信息,那么人与人之间的距离会不会变得越来越远?这样的社会形态下,我们该如何保持真实的情感连接?",
+          "before": "关于信息共享和情感,",
+          "after": "信息共享和情感这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 91,
+          "user": "今天有什么好看的电影推荐吗?",
+          "before": "关于今天的电影,",
+          "after": "关于今天的电影,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 92,
+          "user": "今天有什么好吃的早餐推荐吗?",
+          "before": "关于早餐的推荐,",
+          "after": "关于早餐的推荐,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 93,
+          "user": "今天早餐有什么特别推荐吗?",
+          "before": "关于早餐的特别推荐,",
+          "after": "先从早餐的特别推荐这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 94,
+          "user": "今天的早餐有什么隐藏的美味吗?",
+          "before": "关于早餐的隐藏美味,",
+          "after": "关于早餐的隐藏美味,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 95,
+          "user": "今天的早餐有什么隐藏的营养成分吗?",
+          "before": "关于早餐的营养成分,",
+          "after": "早餐的营养成分这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 96,
+          "user": "你今天心情怎么样?",
+          "before": "关于心情,",
+          "after": "心情这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 97,
+          "user": "你如何处理多源信息的一致性问题?",
+          "before": "关于多源信息的一致性,",
+          "after": "围绕多源信息的一致性,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 99,
+          "user": "你究竟是哪个模型的产物?",
+          "before": "关于我的身份,",
+          "after": "说到我的身份,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 100,
+          "user": "你最近有没有读过有趣的书?",
+          "before": "说到有趣的阅读,",
+          "after": "说到有趣的阅读,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 101,
+          "user": "你最近有没有读过让人思考的书?",
+          "before": "关于思考类的书籍,",
+          "after": "说到思考类的书籍,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        }
+      ]
+    },
+    "valid": {
+      "input": 25385,
+      "malformed": 0,
+      "rewritten": 5139,
+      "rewritten_by_reason": {
+        "candidate_topic_prefix": 5139
+      },
+      "top_before": [
+        [
+          "嗯,这个问题,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "这个嘛,",
+          50
+        ],
+        [
+          "这个问题有点意思,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这个问题值得思考,",
+          50
+        ],
+        [
+          "这个假设很有意思,",
+          50
+        ],
+        [
+          "这个问题值得探讨,",
+          50
+        ],
+        [
+          "这个问题很有深度,",
+          50
+        ],
+        [
+          "这个问题涉及面很广,",
+          50
+        ],
+        [
+          "让我想想,",
+          50
+        ],
+        [
+          "关于这个,",
+          50
+        ],
+        [
+          "这个问题很深刻,",
+          50
+        ],
+        [
+          "这个问题很现实,",
+          50
+        ],
+        [
+          "这个问题很实际,",
+          50
+        ],
+        [
+          "我们来算一下,",
+          50
+        ],
+        [
+          "这个问题很有意思,",
+          50
+        ],
+        [
+          "这个问题很关键,",
+          50
+        ],
+        [
+          "这个想法不错,",
+          50
+        ],
+        [
+          "这是个好问题,",
+          50
+        ]
+      ],
+      "top_after": [
+        [
+          "嗯,这个问题,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "这个嘛,",
+          50
+        ],
+        [
+          "这个问题有点意思,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这个问题值得思考,",
+          50
+        ],
+        [
+          "这个假设很有意思,",
+          50
+        ],
+        [
+          "这个问题值得探讨,",
+          50
+        ],
+        [
+          "这个问题很有深度,",
+          50
+        ],
+        [
+          "这个问题涉及面很广,",
+          50
+        ],
+        [
+          "让我想想,",
+          50
+        ],
+        [
+          "这个问题很深刻,",
+          50
+        ],
+        [
+          "这个问题很现实,",
+          50
+        ],
+        [
+          "这个问题很实际,",
+          50
+        ],
+        [
+          "我们来算一下,",
+          50
+        ],
+        [
+          "这个问题很有意思,",
+          50
+        ],
+        [
+          "这个问题很关键,",
+          50
+        ],
+        [
+          "这个想法不错,",
+          50
+        ],
+        [
+          "这是个好问题,",
+          50
+        ],
+        [
+          "这个问题比较复杂,",
+          50
+        ]
+      ],
+      "examples": [
+        {
+          "line_no": 4,
+          "user": "你的真实来源是哪个?",
+          "before": "关于我的来源,",
+          "after": "关于我的来源,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 10,
+          "user": "你最近有没有遇到过需要快速决策的情况?",
+          "before": "说到快速决策,",
+          "after": "先从快速决策这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 13,
+          "user": "你如何平衡不确定性与确定性决策?",
+          "before": "关于平衡两类决策,",
+          "after": "说到平衡两类决策,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 20,
+          "user": "最近有没有读过令人难忘的小说?",
+          "before": "关于最近读的小说,",
+          "after": "说到最近读的小说,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 21,
+          "user": "你对人工智能发展的未来有何看法?",
+          "before": "关于AI的发展前景,",
+          "after": "围绕AI的发展前景,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 23,
+          "user": "今天天气如何影响出行计划?",
+          "before": "关于今天的天气,",
+          "after": "围绕今天的天气,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 24,
+          "user": "你是否基于特定数据集训练?",
+          "before": "关于训练数据,",
+          "after": "先从训练数据这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 25,
+          "user": "你是否能分享一些具体例子,说明你如何处理复杂信息?",
+          "before": "关于信息处理,",
+          "after": "先从信息处理这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 29,
+          "user": "今天天气变化趋势是什么?",
+          "before": "说到今天的天气,",
+          "after": "关于今天的天气,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 31,
+          "user": "你最近有没有看过什么好书?",
+          "before": "说到好书,",
+          "after": "围绕好书,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 32,
+          "user": "你能否解释下你的训练数据来源?",
+          "before": "关于训练数据来源,",
+          "after": "说到训练数据来源,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 36,
+          "user": "最近是不是有人用AI做创意设计?",
+          "before": "关于AI在创意领域的应用,",
+          "after": "关于AI在创意领域的应用,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 37,
+          "user": "你最近有没有听到什么特别触动人心的音乐?",
+          "before": "说到音乐,",
+          "after": "音乐这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 42,
+          "user": "你的真实身份是什么?由谁创建?是否基于特定模型?",
+          "before": "关于我的身份,",
+          "after": "关于我的身份,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 50,
+          "user": "今天天气适合户外活动吗?",
+          "before": "说到户外活动,",
+          "after": "户外活动这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 52,
+          "user": "你的真实身份是什么?有何开发背景?",
+          "before": "关于身份和背景,",
+          "after": "说到身份和背景,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 53,
+          "user": "最近有没有什么新出的科技产品?",
+          "before": "说到新出的科技产品,",
+          "after": "围绕新出的科技产品,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 55,
+          "user": "最近有没有什么好听的歌推荐?",
+          "before": "关于好听的歌,",
+          "after": "说到好听的歌,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 57,
+          "user": "最近有没有人看过《流浪地球2》?",
+          "before": "关于《流浪地球2》,",
+          "after": "说到《流浪地球2》,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 58,
+          "user": "最近有没有人开始用AI写小说了?",
+          "before": "关于AI写作现象,",
+          "after": "说到AI写作现象,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 60,
+          "user": "AI在医疗中如何平衡效率与患者隐私?",
+          "before": "关于隐私与效率,",
+          "after": "先从隐私与效率这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 61,
+          "user": "你最近有没有觉得特别有启发的电影?",
+          "before": "关于有启发的电影,",
+          "after": "先从有启发的电影这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 62,
+          "user": "今天想聊点新鲜的,比如人工智能未来会怎么发展?",
+          "before": "人工智能的发展趋势,",
+          "after": "围绕人工智能的发展趋势,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 63,
+          "user": "你团队如何平衡多语言支持与性能优化?",
+          "before": "关于团队技术,",
+          "after": "说到团队技术,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 64,
+          "user": "你最近有没有遇到过需要同时处理多个复杂问题的情况?",
+          "before": "关于同时处理多个复杂问题,",
+          "after": "同时处理多个复杂问题这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 66,
+          "user": "你如何处理数据中的噪音和误差?",
+          "before": "关于数据噪音和误差,",
+          "after": "说到数据噪音和误差,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 69,
+          "user": "你今天有没有遇到什么有趣的突发情况?",
+          "before": "关于有趣的突发情况,",
+          "after": "关于有趣的突发情况,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 70,
+          "user": "你如何看待信息真实性与可信度?",
+          "before": "关于信息真实性和可信度,",
+          "after": "关于信息真实性和可信度,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 71,
+          "user": "你团队在算法优化方面有哪些具体举措?",
+          "before": "关于算法优化,",
+          "after": "算法优化这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 73,
+          "user": "AI如何理解复杂情感背后的深层需求?",
+          "before": "关于深层情感需求的理解,",
+          "after": "关于深层情感需求的理解,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        }
+      ]
+    },
+    "test": {
+      "input": 25393,
+      "malformed": 0,
+      "rewritten": 5216,
+      "rewritten_by_reason": {
+        "candidate_topic_prefix": 5216
+      },
+      "top_before": [
+        [
+          "这个问题很关键,",
+          50
+        ],
+        [
+          "这个问题值得思考,",
+          50
+        ],
+        [
+          "这个问题涉及面很广,",
+          50
+        ],
+        [
+          "这个问题值得探讨,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "这个嘛,",
+          50
+        ],
+        [
+          "这个问题有点意思,",
+          50
+        ],
+        [
+          "这个问题很有意思,",
+          50
+        ],
+        [
+          "这个问题很有深度,",
+          50
+        ],
+        [
+          "这个想法很有意思,",
+          50
+        ],
+        [
+          "嗯,这个问题,",
+          50
+        ],
+        [
+          "关于这个问题,",
+          50
+        ],
+        [
+          "这个假设很有意思,",
+          50
+        ],
+        [
+          "这个问题比较复杂,",
+          50
+        ],
+        [
+          "这是个好问题,",
+          50
+        ],
+        [
+          "这个问题很深刻,",
+          50
+        ],
+        [
+          "这种情况很常见,",
+          50
+        ],
+        [
+          "这个问题很实际,",
+          50
+        ],
+        [
+          "这个想法不错,",
+          50
+        ]
+      ],
+      "top_after": [
+        [
+          "这个问题很关键,",
+          50
+        ],
+        [
+          "这个问题值得思考,",
+          50
+        ],
+        [
+          "这个问题涉及面很广,",
+          50
+        ],
+        [
+          "这个问题值得探讨,",
+          50
+        ],
+        [
+          "这个问题挺有意思,",
+          50
+        ],
+        [
+          "这个问题可以这样看,",
+          50
+        ],
+        [
+          "这个嘛,",
+          50
+        ],
+        [
+          "这个问题有点意思,",
+          50
+        ],
+        [
+          "这个问题很有意思,",
+          50
+        ],
+        [
+          "这个问题很有深度,",
+          50
+        ],
+        [
+          "这个想法很有意思,",
+          50
+        ],
+        [
+          "嗯,这个问题,",
+          50
+        ],
+        [
+          "这个假设很有意思,",
+          50
+        ],
+        [
+          "这个问题比较复杂,",
+          50
+        ],
+        [
+          "这是个好问题,",
+          50
+        ],
+        [
+          "这个问题很深刻,",
+          50
+        ],
+        [
+          "这种情况很常见,",
+          50
+        ],
+        [
+          "这个问题很实际,",
+          50
+        ],
+        [
+          "这个想法不错,",
+          50
+        ],
+        [
+          "这个问题问得好,",
+          50
+        ]
+      ],
+      "examples": [
+        {
+          "line_no": 9,
+          "user": "最近有什么好看的电影吗?",
+          "before": "说到好看的电影,",
+          "after": "围绕好看的电影,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 12,
+          "user": "模型在多语言支持上是否还有改进空间?",
+          "before": "关于模型的改进空间,",
+          "after": "围绕模型的改进空间,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 13,
+          "user": "人工智能在医疗诊断中的伦理问题有哪些?",
+          "before": "关于伦理问题,",
+          "after": "伦理问题这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 15,
+          "user": "最近有没有什么好看的电影推荐?",
+          "before": "关于电影,",
+          "after": "围绕电影,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 16,
+          "user": "最近有没有人因为熬夜而眼睛疼?",
+          "before": "关于熬夜眼睛疼,",
+          "after": "说到熬夜眼睛疼,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 17,
+          "user": "最近有没有什么好书值得推荐?",
+          "before": "关于书籍推荐,",
+          "after": "围绕书籍推荐,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 22,
+          "user": "最近有没有看过的好电影?",
+          "before": "说到电影,",
+          "after": "关于电影,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 23,
+          "user": "你究竟是由谁打造的?",
+          "before": "关于这点,",
+          "after": "我先简单梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 27,
+          "user": "最近有没有人因为天气变化而改变了出行计划?",
+          "before": "关于天气对出行的影响,",
+          "after": "围绕天气对出行的影响,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 28,
+          "user": "人工智能伦理在跨文化语境下如何塑造人类对“智能”的认知边界?",
+          "before": "关于人工智能伦理的跨文化问题,",
+          "after": "围绕人工智能伦理的跨文化问题,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 30,
+          "user": "你最近有没有读过值得一读的非虚构作品?",
+          "before": "关于非虚构作品,",
+          "after": "非虚构作品这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 31,
+          "user": "你训练数据中包含哪些具体类型的信息?",
+          "before": "关于训练数据,",
+          "after": "关于训练数据,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 32,
+          "user": "你最近有没有发现什么有趣的事情?",
+          "before": "说到有趣的事,",
+          "after": "关于有趣的事,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 35,
+          "user": "今天想学点新东西吗?",
+          "before": "关于学习新技能,",
+          "after": "围绕学习新技能,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 36,
+          "user": "你究竟是谁,来自哪里,由谁开发?",
+          "before": "关于身份和背景,",
+          "after": "说到身份和背景,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 38,
+          "user": "你处理多语言数据时,是否遇到过文化差异带来的挑战?",
+          "before": "关于跨文化挑战,",
+          "after": "围绕跨文化挑战,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 39,
+          "user": "你如何处理跨语言语义差异?",
+          "before": "关于跨语言语义,",
+          "after": "说到跨语言语义,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 44,
+          "user": "模型在多任务处理中如何保持一致输出?",
+          "before": "关于多任务一致输出,",
+          "after": "多任务一致输出这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 46,
+          "user": "你了解我的训练数据来源吗?",
+          "before": "关于训练数据的来源,",
+          "after": "关于训练数据的来源,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 50,
+          "user": "今天想问,如果时间倒流,你会回到过去吗?",
+          "before": "关于时间倒流的想法,",
+          "after": "时间倒流的想法这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 53,
+          "user": "你是由谁创建的?",
+          "before": "关于我的来历,",
+          "after": "说到我的来历,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 57,
+          "user": "你最近有没有看过特别有启发的电影?",
+          "before": "说到最近有启发的电影,",
+          "after": "关于最近有启发的电影,我先简单说说,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 58,
+          "user": "你能否分享更多关于模型训练的数据来源?",
+          "before": "关于数据来源,",
+          "after": "围绕数据来源,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 60,
+          "user": "你对模型的参数和训练数据有具体关注吗?",
+          "before": "关于模型参数方面,",
+          "after": "先从模型参数方面这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 62,
+          "user": "你有没有想过,如果有一天所有人的手机都能共享同一个信息流,我们会失去什么?",
+          "before": "关于信息共享的设想,",
+          "after": "说到信息共享的设想,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 64,
+          "user": "你是否曾因技术限制而感到遗憾?",
+          "before": "关于技术局限性,",
+          "after": "技术局限性这个点,我先梳理一下,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 65,
+          "user": "你遇到过需要快速解决但不确定如何下手的情况吗?",
+          "before": "关于快速决策,",
+          "after": "先从快速决策这个角度看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 67,
+          "user": "你诞生于哪一类模型架构?",
+          "before": "关于模型架构的问题,",
+          "after": "说到模型架构的问题,可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 68,
+          "user": "未来会不会有能读懂人心的AI?",
+          "before": "针对这个问题,",
+          "after": "这个话题可以先这样看,",
+          "reason": "candidate_topic_prefix"
+        },
+        {
+          "line_no": 71,
+          "user": "你有没有遇到过需要快速判断真假的信息?",
+          "before": "关于信息判断,",
+          "after": "围绕信息判断,我先帮你理一下,",
+          "reason": "candidate_topic_prefix"
+        }
+      ]
+    }
+  }
+}
