@@ -343,6 +343,7 @@ def generate_completion(
     generator = runtime.og.Generator(runtime.model, params)
     qwen_chat.set_generator_inputs(generator, params, input_ids)
     tokenizer_stream = runtime.genai_tokenizer.create_stream()
+    stop_ids = qwen_chat.stop_token_ids(runtime.hf_tokenizer)
 
     pieces: list[str] = []
     while not generator.is_done():
@@ -350,7 +351,10 @@ def generate_completion(
         new_tokens = generator.get_next_tokens()
         if not new_tokens:
             continue
-        pieces.append(tokenizer_stream.decode(new_tokens[0]))
+        token_id = int(new_tokens[0])
+        if token_id in stop_ids:
+            break
+        pieces.append(tokenizer_stream.decode(token_id))
 
     text, completion_tokens = qwen_chat.decode_generated_text(
         runtime.hf_tokenizer,
@@ -395,6 +399,7 @@ def stream_completion_tokens(
     generator = runtime.og.Generator(runtime.model, params)
     qwen_chat.set_generator_inputs(generator, params, input_ids)
     tokenizer_stream = runtime.genai_tokenizer.create_stream()
+    stop_ids = qwen_chat.stop_token_ids(runtime.hf_tokenizer)
 
     def iter_tokens() -> Iterator[str]:
         while not generator.is_done():
@@ -402,7 +407,10 @@ def stream_completion_tokens(
             new_tokens = generator.get_next_tokens()
             if not new_tokens:
                 continue
-            yield tokenizer_stream.decode(new_tokens[0])
+            token_id = int(new_tokens[0])
+            if token_id in stop_ids:
+                break
+            yield tokenizer_stream.decode(token_id)
 
     return len(input_ids), iter_tokens()
 

@@ -272,6 +272,40 @@ def build_search_options(args: argparse.Namespace, *, prompt_tokens: int) -> dic
     return options
 
 
+def stop_token_ids(tokenizer: Any) -> set[int]:
+    ids: set[int] = set()
+    for attr in ("eos_token_id", "sep_token_id"):
+        value = getattr(tokenizer, attr, None)
+        if isinstance(value, int) and value >= 0:
+            ids.add(value)
+
+    convert = getattr(tokenizer, "convert_tokens_to_ids", None)
+    special_map = getattr(tokenizer, "special_tokens_map", None)
+    if callable(convert) and isinstance(special_map, dict):
+        special_tokens: list[str] = []
+        for value in special_map.values():
+            if isinstance(value, str):
+                special_tokens.append(value)
+            elif isinstance(value, list):
+                special_tokens.extend(item for item in value if isinstance(item, str))
+        for token in special_tokens:
+            if "end" not in token and "eos" not in token and "sep" not in token:
+                continue
+            token_id = convert(token)
+            if isinstance(token_id, int) and token_id >= 0:
+                ids.add(token_id)
+    return ids
+
+
+def trim_at_stop_token(completion_ids: list[int], stop_ids: set[int]) -> list[int]:
+    if not stop_ids:
+        return completion_ids
+    for index, token_id in enumerate(completion_ids):
+        if token_id in stop_ids:
+            return completion_ids[: index + 1]
+    return completion_ids
+
+
 def set_generator_inputs(generator: Any, params: Any, input_ids: list[int]) -> None:
     if hasattr(generator, "append_tokens"):
         generator.append_tokens(input_ids)
@@ -288,8 +322,12 @@ def decode_generated_text(
 ) -> tuple[str, int]:
     if hasattr(generator, "get_sequence"):
         sequence = list(generator.get_sequence(0))
-        completion_ids = sequence[prompt_tokens:]
-        text = hf_tokenizer.decode(completion_ids, skip_special_tokens=True).strip()
+        completion_ids = trim_at_stop_token(
+            sequence[prompt_tokens:],
+            stop_token_ids(hf_tokenizer),
+        )
+        text_ids = [token_id for token_id in completion_ids if token_id not in stop_token_ids(hf_tokenizer)]
+        text = hf_tokenizer.decode(text_ids, skip_special_tokens=True).strip()
         return text, len(completion_ids)
 
     text = streamed_text.strip()
@@ -312,6 +350,7 @@ def generate_once(
     generator = og.Generator(model, params)
     set_generator_inputs(generator, params, input_ids)
     tokenizer_stream = genai_tokenizer.create_stream()
+    stop_ids = stop_token_ids(hf_tokenizer)
 
     pieces: list[str] = []
     while not generator.is_done():
@@ -319,7 +358,10 @@ def generate_once(
         new_tokens = generator.get_next_tokens()
         if not new_tokens:
             continue
-        piece = tokenizer_stream.decode(new_tokens[0])
+        token_id = int(new_tokens[0])
+        if token_id in stop_ids:
+            break
+        piece = tokenizer_stream.decode(token_id)
         pieces.append(piece)
         if not args.no_stream:
             print(piece, end="", flush=True)

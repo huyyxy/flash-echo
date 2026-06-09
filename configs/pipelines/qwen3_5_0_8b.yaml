@@ -1,6 +1,6 @@
 model: qwen3_5_0_8b
 default_persona: male_white_collar
-version: v1.0.1
+version: v1.0.2
 
 paths:
   raw_data: data/raw/sft_t2t_mini.jsonl
